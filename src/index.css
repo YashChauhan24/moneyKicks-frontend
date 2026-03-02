@@ -1,0 +1,106 @@
+@import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800;900&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* RicheeRich Yellow & Black Theme */
+    --background: 0 0% 0%;
+    --foreground: 60 100% 95%;
+
+    --card: 0 0% 6%;
+    --card-foreground: 60 100% 95%;
+
+    --popover: 0 0% 4%;
+    --popover-foreground: 60 100% 95%;
+
+    /* Neon Yellow Primary */
+    --primary: 66 100% 50%;
+    --primary-foreground: 0 0% 0%;
+
+    /* Dark Gray Secondary */
+    --secondary: 0 0% 12%;
+    --secondary-foreground: 60 100% 95%;
+
+    --muted: 0 0% 15%;
+    --muted-foreground: 0 0% 60%;
+
+    /* Keep accent as yellow too */
+    --accent: 66 100% 50%;
+    --accent-foreground: 0 0% 0%;
+
+    --destructive: 0 85% 60%;
+    --destructive-foreground: 0 0% 100%;
+
+    /* Success Green */
+    --success: 142 76% 45%;
+    --success-foreground: 0 0% 0%;
+
+    --border: 0 0% 20%;
+    --input: 0 0% 15%;
+    --ring: 66 100% 50%;
+
+    --radius: 0.5rem;
+
+    --sidebar-background: 0 0% 4%;
+    --sidebar-foreground: 60 100% 95%;
+    --sidebar-primary: 66 100% 50%;
+    --sidebar-primary-foreground: 0 0% 0%;
+    --sidebar-accent: 0 0% 12%;
+    --sidebar-accent-foreground: 60 100% 95%;
+    --sidebar-border: 0 0% 20%;
+    --sidebar-ring: 66 100% 50%;
+  }
+
+  .dark {
+    --background: 0 0% 0%;
+    --foreground: 60 100% 95%;
+    --card: 0 0% 6%;
+    --card-foreground: 60 100% 95%;
+    --popover: 0 0% 4%;
+    --popover-foreground: 60 100% 95%;
+    --primary: 66 100% 50%;
+    --primary-foreground: 0 0% 0%;
+    --secondary: 0 0% 12%;
+    --secondary-foreground: 60 100% 95%;
+    --muted: 0 0% 15%;
+    --muted-foreground: 0 0% 60%;
+    --accent: 66 100% 50%;
+    --accent-foreground: 0 0% 0%;
+    --destructive: 0 85% 60%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 0 0% 20%;
+    --input: 0 0% 15%;
+    --ring: 66 100% 50%;
+    --sidebar-background: 0 0% 4%;
+    --sidebar-foreground: 60 100% 95%;
+    --sidebar-primary: 66 100% 50%;
+    --sidebar-primary-foreground: 0 0% 0%;
+    --sidebar-accent: 0 0% 12%;
+    --sidebar-accent-foreground: 60 100% 95%;
+    --sidebar-border: 0 0% 20%;
+    --sidebar-ring: 66 100% 50%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+    font-family: 'Montserrat', sans-serif;
+  }
+}
+
+@layer utilities {
+  .cyber-grid {
+    background-image: 
+      linear-gradient(rgba(229, 255, 0, 0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(229, 255, 0, 0.03) 1px, transparent 1px);
+    background-size: 50px 50px;
+  }
+}
