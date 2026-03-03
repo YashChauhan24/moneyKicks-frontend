@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { ReactNode, useState } from "react";
 import { ArrowLeft, Eye, EyeOff, Copy } from "lucide-react";
 import { Link } from "react-router-dom";
 import Layout from "@/components/layout/Layout";
@@ -24,14 +24,21 @@ import {
 } from "wagmi";
 import { avalanche, avalancheFuji } from "wagmi/chains";
 import { isAddress, parseUnits } from "viem";
-import { CIRCUIT_CONFIG, CIRCUIT_URLS, CONTRACTS } from "@/config/contracts";
 import {
-  DEMO_TOKEN_ABI as erc20Abi,
-  formatDisplayAmount,
-} from "@/pkg/constants";
+  CIRCUIT_URLS,
+  SUPPORTED_TOKENS,
+  SupportedToken,
+} from "@/config/contracts";
+import { DEMO_TOKEN_ABI as erc20Abi, formatTokenAmount } from "@/pkg/constants";
 import { useQueryClient } from "@tanstack/react-query";
 
-const Operations = () => {
+const TokenOperationsContent = ({
+  selectedToken,
+  setSelectedToken,
+}: {
+  selectedToken: SupportedToken;
+  setSelectedToken: (t: SupportedToken) => void;
+}) => {
   const { isConnected, address } = useAccount();
   const { network, tokenSymbol, explorerUrl } = useNetwork();
   const queryClient = useQueryClient();
@@ -46,6 +53,8 @@ const Operations = () => {
   const [generatingKey, setGeneratingKey] = useState(false);
   const [showKey, setShowKey] = useState(false);
 
+  const tokenConfig = SUPPORTED_TOKENS[selectedToken];
+  console.log(tokenConfig, selectedToken);
   const {
     register,
     useEncryptedBalance,
@@ -57,8 +66,8 @@ const Operations = () => {
   } = useEERC(
     publicClient as CompatiblePublicClient,
     walletClient as CompatibleWalletClient,
-    CONTRACTS.EERC_CONVERTER,
-    CIRCUIT_CONFIG,
+    tokenConfig.converter,
+    CIRCUIT_URLS,
   );
 
   const {
@@ -68,7 +77,7 @@ const Operations = () => {
     refetchBalance,
     decryptedBalance,
     decimals,
-  } = useEncryptedBalance(CONTRACTS.ERC20);
+  } = useEncryptedBalance(tokenConfig.address);
 
   const [tab, setTab] = useState<
     "deposit" | "withdraw" | "transfer" | "decrypt"
@@ -86,7 +95,7 @@ const Operations = () => {
     functionName: "decimals",
     args: [],
     query: { enabled: !!address },
-    address: CONTRACTS.ERC20,
+    address: tokenConfig.address,
   }) as { data: number };
 
   const { data: erc20Balance, refetch: refetchErc20Balance } = useReadContract({
@@ -94,7 +103,7 @@ const Operations = () => {
     functionName: "balanceOf",
     args: [address as `0x${string}`],
     query: { enabled: !!address, staleTime: 3000 },
-    address: CONTRACTS.ERC20,
+    address: tokenConfig.address,
   });
 
   const { data: erc20Symbol } = useReadContract({
@@ -102,17 +111,28 @@ const Operations = () => {
     functionName: "symbol",
     args: [],
     query: { enabled: !!address },
-    address: CONTRACTS.ERC20,
+    address: tokenConfig.address,
   });
 
   const { data: approveAmount, refetch: refetchApproveAmount } =
     useReadContract({
       abi: erc20Abi,
       functionName: "allowance",
-      args: [address as `0x${string}`, CONTRACTS.EERC_CONVERTER],
+      args: [address as `0x${string}`, tokenConfig.converter],
       query: { enabled: !!address, staleTime: 3000 },
-      address: CONTRACTS.ERC20,
+      address: tokenConfig.address,
     }) as { data: bigint; refetch: () => void };
+
+  const {
+    data: timeUntilNextRequest = 0n,
+    refetch: refetchTimeUntilNextRequest,
+  } = useReadContract({
+    abi: erc20Abi,
+    functionName: "timeUntilNextRequest",
+    args: [address as `0x${string}`],
+    query: { enabled: !!address, refetchInterval: 1000 },
+    address: tokenConfig.address,
+  }) as { data: bigint; refetch: () => void };
 
   const getExplorerUrl = (txHash: string) => `${explorerUrl}/tx/${txHash}`;
 
@@ -126,18 +146,18 @@ const Operations = () => {
     setLoading(true);
     try {
       const parsedAmount = parseUnits(amount, Number(erc20Decimals));
-      if (
-        erc20Balance !== undefined &&
-        parsedAmount > (erc20Balance as bigint)
-      ) {
-        return toast.error("Insufficient Token Balance");
-      }
+      // if (
+      //   erc20Balance !== undefined &&
+      //   parsedAmount > (erc20Balance as bigint)
+      // ) {
+      //   return toast.error("Insufficient Token Balance");
+      // }
 
       const txHash = await writeContractAsync({
         abi: erc20Abi,
         functionName: "approve",
-        args: [CONTRACTS.EERC_CONVERTER, parsedAmount],
-        address: CONTRACTS.ERC20,
+        args: [tokenConfig.converter, parsedAmount],
+        address: tokenConfig.address,
         account: address as `0x${string}`,
         chain: network === "testnet" ? avalancheFuji : avalanche,
       });
@@ -162,6 +182,7 @@ const Operations = () => {
       );
     } catch (error) {
       toast.error(error?.message || "Approve failed");
+      console.error(error);
       await refetchBalance();
       await refetchErc20Balance();
     } finally {
@@ -184,21 +205,22 @@ const Operations = () => {
     try {
       const parsedAmount = parseUnits(amount, Number(erc20Decimals));
 
-      if (
-        erc20Balance !== undefined &&
-        parsedAmount > (erc20Balance as bigint)
-      ) {
-        return toast.error("Insufficient Token Balance");
-      }
+      // if (
+      //   erc20Balance !== undefined &&
+      //   parsedAmount > (erc20Balance as bigint)
+      // ) {
+      //   return toast.error("Insufficient Token Balance");
+      // }
+      console.log("approveAmount", approveAmount);
 
-      if (
-        approveAmount === undefined ||
-        parsedAmount > (approveAmount as bigint)
-      ) {
-        return toast.error(
-          "Insufficient allowance. Please approve tokens first.",
-        );
-      }
+      // if (
+      //   approveAmount === undefined ||
+      //   parsedAmount > (approveAmount as bigint)
+      // ) {
+      //   return toast.error(
+      //     "Insufficient allowance. Please approve tokens first.",
+      //   );
+      // }
 
       const result = await deposit(parsedAmount);
 
@@ -224,6 +246,7 @@ const Operations = () => {
       );
     } catch (error) {
       toast.error(error?.message || "Deposit failed");
+      console.error(error);
       await refetchBalance();
       await refetchErc20Balance();
     } finally {
@@ -290,6 +313,7 @@ const Operations = () => {
       await refetchBalance();
       await refetchErc20Balance();
       toast.error(error?.message || "Withdraw failed. Please try again.");
+      console.error(error);
     } finally {
       setAmount("");
       setLoading(false);
@@ -331,7 +355,7 @@ const Operations = () => {
         toast.error("Insufficient encrypted balance");
         return;
       }
-      console.log("Mode Contract:", CONTRACTS.EERC_CONVERTER);
+      console.log("Mode Contract:", tokenConfig.converter);
       console.log("Encrypted balance:", decryptedBalance);
       console.log("Decimals:", decimals);
       console.log("Parsed amount:", parsedAmount);
@@ -401,6 +425,312 @@ const Operations = () => {
     }
   };
 
+  return (
+    <Layout>
+      <div className="min-h-screen bg-background px-6 py-10">
+        <div className="max-w-7xl mx-auto">
+          {/* HEADER */}
+          <div className="flex items-center justify-between mb-10">
+            <Link
+              to="/"
+              className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition"
+            >
+              <ArrowLeft className="w-4 h-4" />
+              Back
+            </Link>
+
+            <div className="flex items-center gap-3 px-4 py-2 rounded-full bg-muted/40 border">
+              <div
+                className={`w-2 h-2 rounded-full ${
+                  isInitialized
+                    ? "bg-emerald-500"
+                    : "bg-yellow-500 animate-pulse"
+                }`}
+              />
+              <span className="text-xs font-medium">
+                {isInitialized ? "ZK Circuit Ready" : "Initializing ZK Circuit"}
+              </span>
+            </div>
+          </div>
+
+          {/* MAIN GRID */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-stretch">
+            {/* LEFT SIDE – OPERATIONS */}
+            <div className="lg:col-span-2 flex">
+              <Card className="flex-1 border bg-card/70 backdrop-blur-xl shadow-xl rounded-2xl">
+                <CardContent className="p-8 flex flex-col h-full">
+                  <Tabs
+                    value={tab}
+                    onValueChange={(v) => {
+                      setTab(v as any);
+                      setAmount("");
+                      setRecipient("");
+                    }}
+                  >
+                    <TabsList className="grid grid-cols-4 bg-muted/40 p-1 rounded-xl mb-8">
+                      {["decrypt", "deposit", "withdraw", "transfer"].map(
+                        (t) => (
+                          <TabsTrigger
+                            key={t}
+                            value={t}
+                            disabled={t !== "decrypt" && !isDecryptionKeySet}
+                            className="data-[state=active]:bg-background data-[state=active]:shadow-sm rounded-lg text-sm"
+                          >
+                            {t.charAt(0).toUpperCase() + t.slice(1)}
+                          </TabsTrigger>
+                        ),
+                      )}
+                    </TabsList>
+
+                    {/* ------------------ DECRYPT ------------------ */}
+                    {tab === "decrypt" && (
+                      <div className="space-y-6">
+                        <div className="p-6 rounded-xl border bg-muted/20">
+                          <h2 className="text-lg font-semibold mb-4">
+                            Generate Decryption Key
+                          </h2>
+                          {!decryptionKey && (
+                            <Button
+                              onClick={handleGenerateKey}
+                              disabled={isDecryptionKeySet || generatingKey}
+                              className="w-full"
+                            >
+                              {generatingKey ? "Generating..." : "Generate Key"}
+                            </Button>
+                          )}
+
+                          {decryptionKey && (
+                            <div className="mt-6 space-y-4">
+                              <div className="p-4 bg-background border rounded-lg font-mono text-xs break-all">
+                                {showKey
+                                  ? decryptionKey
+                                  : "••••••••••••••••••••••••••••"}
+                              </div>
+
+                              <div className="flex gap-3">
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => setShowKey(!showKey)}
+                                >
+                                  {showKey ? (
+                                    <EyeOff className="w-4 h-4 mr-1" />
+                                  ) : (
+                                    <Eye className="w-4 h-4 mr-1" />
+                                  )}
+                                  {showKey ? "Hide" : "Show"}
+                                </Button>
+
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => {
+                                    navigator.clipboard.writeText(
+                                      decryptionKey,
+                                    );
+                                    toast.success("Copied");
+                                  }}
+                                >
+                                  <Copy className="w-4 h-4 mr-1" />
+                                  Copy
+                                </Button>
+                              </div>
+
+                              <p className="text-xs text-yellow-500">
+                                Store this key securely. Loss means permanent
+                                loss of shielded access.
+                              </p>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* ------------------ DEPOSIT ------------------ */}
+                    {tab === "deposit" && (
+                      <div className="space-y-6">
+                        <AssetSelector
+                          selectedToken={selectedToken}
+                          onTokenChange={setSelectedToken}
+                        />
+
+                        <Input
+                          placeholder="0.00"
+                          value={amount}
+                          onChange={(e) => setAmount(e.target.value)}
+                          className="h-12 text-lg"
+                        />
+
+                        <QuickButtons setAmount={setAmount} />
+
+                        <div className="flex gap-4">
+                          <Button
+                            variant="outline"
+                            onClick={handleApprove}
+                            disabled={loading}
+                            className="w-full"
+                          >
+                            Approve
+                          </Button>
+
+                          <Button
+                            onClick={handleDeposit}
+                            disabled={loading}
+                            className="w-full"
+                          >
+                            {loading ? "Processing..." : "Deposit"}
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* ------------------ WITHDRAW ------------------ */}
+                    {tab === "withdraw" && (
+                      <div className="space-y-6">
+                        <AssetSelector
+                          selectedToken={selectedToken}
+                          onTokenChange={setSelectedToken}
+                        />
+
+                        <Input
+                          placeholder="0.00"
+                          value={amount}
+                          onChange={(e) => setAmount(e.target.value)}
+                          className="h-12 text-lg"
+                        />
+
+                        <QuickButtons setAmount={setAmount} />
+
+                        <Button
+                          onClick={handleWithdraw}
+                          disabled={loading}
+                          className="w-full"
+                        >
+                          {loading ? "Processing..." : "Withdraw"}
+                        </Button>
+                      </div>
+                    )}
+
+                    {/* ------------------ TRANSFER ------------------ */}
+                    {tab === "transfer" && (
+                      <div className="space-y-6">
+                        <Input
+                          placeholder="Recipient Address"
+                          value={recipient}
+                          onChange={(e) => setRecipient(e.target.value)}
+                          className="h-12"
+                        />
+
+                        <Input
+                          placeholder="Amount"
+                          value={amount}
+                          onChange={(e) => setAmount(e.target.value)}
+                          className="h-12"
+                        />
+
+                        <div className="flex gap-3">
+                          <Button
+                            variant={
+                              transferType === "internal"
+                                ? "default"
+                                : "outline"
+                            }
+                            onClick={() => setTransferType("internal")}
+                            className="w-full"
+                          >
+                            Private
+                          </Button>
+
+                          <Button
+                            variant={
+                              transferType === "external"
+                                ? "default"
+                                : "outline"
+                            }
+                            onClick={() => setTransferType("external")}
+                            className="w-full"
+                          >
+                            Public
+                          </Button>
+                        </div>
+
+                        <Button onClick={handleTransfer} className="w-full">
+                          Transfer
+                        </Button>
+                      </div>
+                    )}
+                  </Tabs>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* RIGHT SIDE – PORTFOLIO CARD */}
+            <div className="flex">
+              <Card className="flex-1 border bg-gradient-to-br from-muted/30 to-muted/10 backdrop-blur-xl shadow-xl rounded-2xl">
+                <CardContent className="p-8 flex flex-col justify-between h-full">
+                  <div>
+                    <p className="text-xs text-muted-foreground uppercase tracking-wider">
+                      Wallet Balance
+                    </p>
+                    <p className="text-3xl font-semibold mt-2">
+                      {erc20Balance
+                        ? (
+                            Number(erc20Balance) /
+                            10 ** (erc20Decimals || 18)
+                          ).toFixed(2)
+                        : "0"}{" "}
+                      {(erc20Symbol || tokenSymbol) as ReactNode}
+                    </p>
+                  </div>
+
+                  <div className="border-t pt-6">
+                    <p className="text-xs text-muted-foreground uppercase tracking-wider">
+                      Approved
+                    </p>
+                    <p className="text-xl font-medium mt-2">
+                      {approveAmount
+                        ? (
+                            Number(approveAmount) /
+                            10 ** (erc20Decimals || 18)
+                          ).toFixed(2)
+                        : "0"}{" "}
+                      {(erc20Symbol || tokenSymbol) as ReactNode}
+                    </p>
+                  </div>
+
+                  <div className="border-t pt-6">
+                    <p className="text-xs text-muted-foreground uppercase tracking-wider">
+                      Shielded Balance
+                    </p>
+                    <p className="text-xl font-medium mt-2 text-primary">
+                      {decryptedBalance
+                        ? formatTokenAmount(decryptedBalance, 18)
+                        : "0"}{" "}
+                      {(erc20Symbol || tokenSymbol) as ReactNode}
+                    </p>
+                  </div>
+
+                  <Button
+                    variant="outline"
+                    onClick={() => refetchBalance()}
+                    className="w-full mt-4"
+                  >
+                    Refresh Balance
+                  </Button>
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+        </div>
+      </div>
+    </Layout>
+  );
+};
+
+const Operations = () => {
+  const { isConnected } = useAccount();
+  const [selectedToken, setSelectedToken] = useState<SupportedToken>("USDC");
+
   if (!isConnected) {
     return (
       <Layout>
@@ -416,205 +746,11 @@ const Operations = () => {
   }
 
   return (
-    <Layout>
-      <div className="min-h-screen px-6 py-12 max-w-5xl mx-auto">
-        <div className="flex justify-between items-center mb-6">
-          <Link to="/" className="flex items-center">
-            <ArrowLeft className="w-4 h-4 mr-2" />
-            Back
-          </Link>
-
-          <div className="flex items-center space-x-2">
-            <div
-              className={`w-3 h-3 rounded-full ${isInitialized ? "bg-green-500" : "bg-yellow-500 animate-pulse"}`}
-            ></div>
-            <span className="text-sm font-medium text-muted-foreground mr-2">
-              {isInitialized
-                ? "ZK Circuit Ready"
-                : "Initializing ZK Circuit..."}
-            </span>
-          </div>
-        </div>
-
-        <Card className="p-6">
-          <Tabs
-            value={tab}
-            onValueChange={(v) => {
-              setTab(v as "deposit" | "withdraw" | "transfer" | "decrypt");
-              setAmount("");
-              setRecipient("");
-            }}
-          >
-            <TabsList className="grid grid-cols-4 mb-6">
-              <TabsTrigger value="decrypt">Decrypt</TabsTrigger>
-              <TabsTrigger value="deposit" disabled={!isDecryptionKeySet}>
-                Deposit
-              </TabsTrigger>
-              <TabsTrigger value="withdraw" disabled={!isDecryptionKeySet}>
-                Withdraw
-              </TabsTrigger>
-              <TabsTrigger value="transfer" disabled={!isDecryptionKeySet}>
-                Transfer
-              </TabsTrigger>
-            </TabsList>
-
-            {/* ------------------ DECRYPT ------------------ */}
-            {tab === "decrypt" && (
-              <div className="space-y-6">
-                <Card className="p-6 space-y-4">
-                  <h2 className="text-xl font-semibold">
-                    Generate Decryption Key
-                  </h2>
-                  {isRegistered && (
-                    <Button
-                      onClick={handleGenerateKey}
-                      disabled={isDecryptionKeySet || generatingKey}
-                    >
-                      {generatingKey ? "Generating..." : "Generate Key"}
-                    </Button>
-                  )}
-
-                  {decryptionKey && (
-                    <div className="space-y-3">
-                      <div className="p-3 bg-muted rounded break-all font-mono text-xs">
-                        {showKey ? decryptionKey : "••••••••••••••••••••••••"}
-                      </div>
-
-                      <div className="flex gap-2">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => setShowKey(!showKey)}
-                        >
-                          {showKey ? (
-                            <EyeOff className="w-4 h-4 mr-1" />
-                          ) : (
-                            <Eye className="w-4 h-4 mr-1" />
-                          )}
-                          {showKey ? "Hide" : "Show"}
-                        </Button>
-
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => {
-                            navigator.clipboard.writeText(decryptionKey);
-                            toast.success("Copied to clipboard");
-                          }}
-                        >
-                          <Copy className="w-4 h-4 mr-1" />
-                          Copy
-                        </Button>
-                      </div>
-
-                      <div className="text-yellow-500 text-sm">
-                        ⚠️ Store this key securely. If lost, you cannot decrypt
-                        your shielded balance.
-                      </div>
-                    </div>
-                  )}
-                </Card>
-              </div>
-            )}
-
-            {/* ------------------ DEPOSIT ------------------ */}
-            {tab === "deposit" && (
-              <div className="space-y-6">
-                <AssetSelector symbol={erc20Symbol as string} />
-                <Input
-                  placeholder="0.0"
-                  value={amount}
-                  onChange={(e) => setAmount(e.target.value)}
-                />
-                <QuickButtons setAmount={setAmount} />
-                <div className=" space-x-4 flex text-nowrap text-center align-middle">
-                  <Button onClick={handleApprove} disabled={loading}>
-                    {loading ? "Processing..." : "Approve"}
-                  </Button>
-                  <Button onClick={handleDeposit} disabled={loading}>
-                    {loading ? "Processing..." : "Deposit"}
-                  </Button>
-                </div>
-              </div>
-            )}
-
-            {/* ------------------ WITHDRAW ------------------ */}
-            {tab === "withdraw" && (
-              <div className="space-y-6">
-                <AssetSelector symbol={erc20Symbol as string} />
-                <Input
-                  placeholder="0.0"
-                  value={amount}
-                  onChange={(e) => setAmount(e.target.value)}
-                />
-                <QuickButtons setAmount={setAmount} />
-                <Button onClick={handleWithdraw} disabled={loading}>
-                  {loading ? "Processing..." : "Withdraw"}
-                </Button>
-              </div>
-            )}
-
-            {/* ------------------ TRANSFER ------------------ */}
-            {tab === "transfer" && (
-              <div className="space-y-6">
-                <Input
-                  placeholder="Recipient"
-                  value={recipient}
-                  onChange={(e) => setRecipient(e.target.value)}
-                />
-                <Input
-                  placeholder="Amount"
-                  value={amount}
-                  onChange={(e) => setAmount(e.target.value)}
-                />
-                <div className="flex gap-2">
-                  <Button
-                    variant={
-                      transferType === "internal" ? "default" : "outline"
-                    }
-                    onClick={() => setTransferType("internal")}
-                  >
-                    Private
-                  </Button>
-                  <Button
-                    variant={
-                      transferType === "external" ? "default" : "outline"
-                    }
-                    onClick={() => setTransferType("external")}
-                  >
-                    Public
-                  </Button>
-                </div>
-                <Button onClick={handleTransfer}>Transfer</Button>
-              </div>
-            )}
-          </Tabs>
-        </Card>
-
-        {/* Sidebar Balance */}
-        <div className="mt-8 space-y-4">
-          <Button variant="outline" onClick={() => refetchBalance()}>
-            Refresh
-          </Button>
-
-          <Card className="p-4 text-center">
-            <p>Wallet Balance</p>
-            <p className="text-xl font-bold">
-              {erc20Balance
-                ? (Number(erc20Balance) / 10 ** (erc20Decimals || 18)).toFixed(
-                    2,
-                  )
-                : "0"}{" "}
-              {(erc20Symbol as string) || tokenSymbol}
-            </p>
-            <p>
-              {formatDisplayAmount(decryptedBalance)}{" "}
-              {(erc20Symbol as string) || tokenSymbol}
-            </p>
-          </Card>
-        </div>
-      </div>
-    </Layout>
+    <TokenOperationsContent
+      key={selectedToken}
+      selectedToken={selectedToken}
+      setSelectedToken={setSelectedToken}
+    />
   );
 };
 
