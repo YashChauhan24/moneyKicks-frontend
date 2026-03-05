@@ -25,6 +25,7 @@ import {
   usePublicClient,
 } from "wagmi";
 import { parseEther } from "viem";
+import { BETTING_CONTRACT_ABI } from "@/config/bettingContract";
 import { useNetwork } from "@/contexts/NetworkContext";
 import { toast } from "sonner";
 
@@ -130,6 +131,7 @@ const CreateBet = () => {
 
       const receipt = await publicClient.waitForTransactionReceipt({
         hash: paymentHash,
+
       });
 
       if (receipt.status !== "success") {
@@ -161,6 +163,7 @@ const CreateBet = () => {
       await handlePay(formData.stakeAmount);
 
       // 1. Save Bet to Backend DB only after payment confirmation
+
       const payload = {
         title: `${formData.competitorA} vs ${formData.competitorB}`,
         description: formData.description,
