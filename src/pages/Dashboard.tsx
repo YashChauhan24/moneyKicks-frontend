@@ -1,18 +1,43 @@
+import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { Link } from "react-router-dom";
-import { Trophy, Target, Wallet, TrendingUp, Users, Clock, ArrowRight, Zap } from "lucide-react";
+import {
+  Trophy,
+  Target,
+  Wallet,
+  TrendingUp,
+  Users,
+  Clock,
+  ArrowRight,
+  Zap,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { formatCurrency } from "@/lib/utils";
 import Layout from "@/components/layout/Layout";
 import StatCard from "@/components/ui/StatCard";
 import GlowCard from "@/components/ui/GlowCard";
 import BouncingMoney from "@/components/ui/BouncingMoney";
+import { fetchDashboard, DashboardResponse } from "@/queries/DashboardApis";
 
 const Dashboard = () => {
-  const recentBets = [
-    { id: 1, title: "BTC vs ETH - Q1 Winner", stake: "500 SOL", status: "Live", participants: 234 },
-    { id: 2, title: "Solana TPS Challenge", stake: "200 SOL", status: "Live", participants: 89 },
-    { id: 3, title: "NFT Floor Price Battle", stake: "1000 SOL", status: "Settled", participants: 456 },
-  ];
+  const [data, setData] = useState<DashboardResponse | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        const response = await fetchDashboard();
+        setData(response);
+      } catch (error) {
+        console.error("Failed to fetch dashboard data:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadData();
+  }, []);
+
+  const recentBets = data?.recentBets ?? [];
 
   const container = {
     hidden: { opacity: 0 },
@@ -42,20 +67,26 @@ const Dashboard = () => {
               <div className="flex-1">
                 <h1 className="text-5xl md:text-7xl font-bold mb-6 leading-tight tracking-tight">
                   <span className="text-foreground">The </span>
-                  <span className="bg-primary text-primary-foreground px-3 py-1 inline-block">ultimate</span>
+                  <span className="bg-primary text-primary-foreground px-3 py-1 inline-block">
+                    ultimate
+                  </span>
                   <br />
                   <span className="text-foreground">betting platform for</span>
                   <br />
                   <span className="text-foreground">Web3 enthusiasts</span>
                 </h1>
                 <p className="text-xl text-muted-foreground max-w-xl mb-10">
-                  Win big with weekly jackpots or stake against competitors on Solana.
+                  Win big with weekly jackpots or stake against competitors on
+                  Avalanche.
                 </p>
-                
+
                 {/* CTA Buttons */}
                 <div className="flex flex-wrap gap-4 mb-10">
                   <Link to="/jackpot">
-                    <Button size="lg" className="bg-primary text-primary-foreground hover:bg-primary/90">
+                    <Button
+                      size="lg"
+                      className="bg-primary text-primary-foreground hover:bg-primary/90"
+                    >
                       Enter Weekly Draw
                     </Button>
                   </Link>
@@ -80,10 +111,15 @@ const Dashboard = () => {
               </div>
               <div>
                 <p className="text-foreground font-medium">
-                  Weekly jackpot is now at <span className="text-primary font-bold">$48,500</span>. 
-                  Enter for just $2 and win up to 50% of the pool.
+                  Weekly jackpot is now active. Enter for just{" "}
+                  {formatCurrency(data?.jackpot?.minAmount ?? "2")}{" "}
+                  {data?.jackpot?.currency || "USD"} and win up to 50% of the
+                  pool.
                 </p>
-                <Link to="/jackpot" className="inline-flex items-center gap-1 text-primary font-medium mt-2 hover:underline">
+                <Link
+                  to="/jackpot"
+                  className="inline-flex items-center gap-1 text-primary font-medium mt-2 hover:underline"
+                >
                   Learn more <ArrowRight className="w-4 h-4" />
                 </Link>
               </div>
@@ -100,34 +136,31 @@ const Dashboard = () => {
             <motion.div variants={item}>
               <StatCard
                 title="Total Value Locked"
-                value="$2.4M"
+                value={`$${formatCurrency(data?.stats.totalValueLocked || 0)}`}
                 icon={Wallet}
-                trend={{ value: "12.5%", positive: true }}
                 color="primary"
               />
             </motion.div>
             <motion.div variants={item}>
               <StatCard
                 title="Active Bets"
-                value="156"
+                value={(data?.stats.activeBets || 0).toLocaleString()}
                 icon={Target}
-                trend={{ value: "8 new", positive: true }}
                 color="primary"
               />
             </motion.div>
             <motion.div variants={item}>
               <StatCard
                 title="Weekly Jackpot"
-                value="$48,500"
+                value={data?.jackpot ? "Active" : "Inactive"}
                 icon={Trophy}
-                trend={{ value: "Growing", positive: true }}
                 color="success"
               />
             </motion.div>
             <motion.div variants={item}>
               <StatCard
                 title="Active Users"
-                value="12,456"
+                value={(data?.stats.activeUsers || 0).toLocaleString()}
                 icon={Users}
                 color="primary"
               />
@@ -150,23 +183,36 @@ const Dashboard = () => {
                       <Trophy className="w-8 h-8 text-primary" />
                     </div>
                     <div>
-                      <h2 className="text-2xl font-bold text-foreground">Weekly Jackpot</h2>
-                      <p className="text-muted-foreground">Enter for just $2</p>
+                      <h2 className="text-2xl font-bold text-foreground">
+                        Weekly Jackpot
+                      </h2>
+                      <p className="text-muted-foreground">
+                        Enter for just{" "}
+                        {formatCurrency(data?.jackpot?.minAmount ?? "2")}{" "}
+                        {data?.jackpot?.currency || "USD"}
+                      </p>
                     </div>
                   </div>
 
                   <div className="flex-grow">
                     <div className="bg-secondary/50 rounded-lg p-6 mb-6">
-                      <p className="text-sm text-muted-foreground mb-2">Current Pool</p>
-                      <p className="text-4xl font-bold text-primary">$48,500</p>
+                      <p className="text-sm text-muted-foreground mb-2">
+                        Jackpot minimum entry
+                      </p>
+                      <p className="text-4xl font-bold text-primary">
+                        {formatCurrency(data?.jackpot?.minAmount ?? "2")}{" "}
+                        {data?.jackpot?.currency || "USD"}
+                      </p>
                       <div className="flex items-center gap-4 mt-4 text-sm text-muted-foreground">
                         <span className="flex items-center gap-1">
                           <Users className="w-4 h-4" />
-                          2,456 entries
+                          {data?.jackpot?.totalEntries ?? 0} entries
                         </span>
                         <span className="flex items-center gap-1">
                           <Clock className="w-4 h-4" />
-                          3d 14h left
+                          {data?.jackpot?.endAt
+                            ? new Date(data.jackpot.endAt).toLocaleDateString()
+                            : "Ongoing"}
                         </span>
                       </div>
                     </div>
@@ -174,15 +220,21 @@ const Dashboard = () => {
                     <div className="space-y-3 mb-6">
                       <div className="flex justify-between text-sm">
                         <span className="text-muted-foreground">1st Place</span>
-                        <span className="text-success font-semibold">50% of pool</span>
+                        <span className="text-success font-semibold">
+                          50% of pool
+                        </span>
                       </div>
                       <div className="flex justify-between text-sm">
                         <span className="text-muted-foreground">2nd Place</span>
-                        <span className="text-success font-semibold">30% of pool</span>
+                        <span className="text-success font-semibold">
+                          30% of pool
+                        </span>
                       </div>
                       <div className="flex justify-between text-sm">
                         <span className="text-muted-foreground">3rd Place</span>
-                        <span className="text-success font-semibold">20% of pool</span>
+                        <span className="text-success font-semibold">
+                          20% of pool
+                        </span>
                       </div>
                     </div>
                   </div>
@@ -207,8 +259,12 @@ const Dashboard = () => {
                       <Target className="w-8 h-8 text-primary" />
                     </div>
                     <div>
-                      <h2 className="text-2xl font-bold text-foreground">Competitor Betting</h2>
-                      <p className="text-muted-foreground">Stake or predict outcomes</p>
+                      <h2 className="text-2xl font-bold text-foreground">
+                        Competitor Betting
+                      </h2>
+                      <p className="text-muted-foreground">
+                        Stake or predict outcomes
+                      </p>
                     </div>
                   </div>
 
@@ -220,10 +276,12 @@ const Dashboard = () => {
                           className="bg-secondary/50 rounded-lg p-4 border border-border hover:border-primary/50 transition-colors"
                         >
                           <div className="flex items-center justify-between mb-2">
-                            <h3 className="font-semibold text-foreground">{bet.title}</h3>
+                            <h3 className="font-semibold text-foreground">
+                              {bet.title}
+                            </h3>
                             <span
                               className={`px-3 py-1 rounded-lg text-xs font-medium ${
-                                bet.status === "Live"
+                                bet.status === "live"
                                   ? "bg-success/20 text-success"
                                   : "bg-muted text-muted-foreground"
                               }`}
@@ -232,7 +290,10 @@ const Dashboard = () => {
                             </span>
                           </div>
                           <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                            <span>Stake: {bet.stake}</span>
+                            <span>
+                              Stake: {formatCurrency(bet.stakeAmount)}{" "}
+                              {bet.currency}
+                            </span>
                             <span>{bet.participants} predictors</span>
                           </div>
                         </div>
@@ -245,7 +306,9 @@ const Dashboard = () => {
                         <span className="font-medium">Hot Bets</span>
                       </div>
                       <p className="text-sm text-muted-foreground">
-                        156 active bets with over $2.4M in stakes
+                        {data?.stats.activeBets || 0} active bets with over $
+                        {formatCurrency(data?.stats.totalValueLocked || 0)} in
+                        stakes
                       </p>
                     </div>
                   </div>
@@ -275,27 +338,46 @@ const Dashboard = () => {
             transition={{ delay: 0.4 }}
           >
             <GlowCard hover={false}>
-              <h2 className="text-xl font-bold text-foreground mb-6">Recent Activity</h2>
+              <h2 className="text-xl font-bold text-foreground mb-6">
+                Recent Activity
+              </h2>
               <div className="overflow-x-auto">
                 <table className="w-full">
                   <thead>
                     <tr className="border-b border-border">
-                      <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Bet</th>
-                      <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Stake</th>
-                      <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Status</th>
-                      <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Participants</th>
-                      <th className="text-right py-3 px-4 text-sm font-medium text-muted-foreground">Action</th>
+                      <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">
+                        Bet
+                      </th>
+                      <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">
+                        Stake
+                      </th>
+                      <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">
+                        Status
+                      </th>
+                      <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">
+                        Participants
+                      </th>
+                      <th className="text-right py-3 px-4 text-sm font-medium text-muted-foreground">
+                        Action
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
                     {recentBets.map((bet) => (
-                      <tr key={bet.id} className="border-b border-border/50 hover:bg-secondary/30 transition-colors">
-                        <td className="py-4 px-4 font-medium text-foreground">{bet.title}</td>
-                        <td className="py-4 px-4 text-muted-foreground">{bet.stake}</td>
+                      <tr
+                        key={bet.id}
+                        className="border-b border-border/50 hover:bg-secondary/30 transition-colors"
+                      >
+                        <td className="py-4 px-4 font-medium text-foreground">
+                          {bet.title}
+                        </td>
+                        <td className="py-4 px-4 text-muted-foreground">
+                          {formatCurrency(bet.stakeAmount)} {bet.currency}
+                        </td>
                         <td className="py-4 px-4">
                           <span
                             className={`px-3 py-1 rounded-lg text-xs font-medium ${
-                              bet.status === "Live"
+                              bet.status === "live"
                                 ? "bg-success/20 text-success"
                                 : "bg-muted text-muted-foreground"
                             }`}
@@ -303,9 +385,15 @@ const Dashboard = () => {
                             {bet.status}
                           </span>
                         </td>
-                        <td className="py-4 px-4 text-muted-foreground">{bet.participants}</td>
+                        <td className="py-4 px-4 text-muted-foreground">
+                          {bet.participants}
+                        </td>
                         <td className="py-4 px-4 text-right">
-                          <Button size="sm" variant="ghost" className="text-primary hover:text-primary/80">
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="text-primary hover:text-primary/80"
+                          >
                             View <ArrowRight className="w-4 h-4 ml-1" />
                           </Button>
                         </td>

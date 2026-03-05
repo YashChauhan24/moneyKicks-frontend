@@ -24,13 +24,14 @@ import {
   JackpotPoolData,
 } from "@/queries/JackpotApis";
 import { toast } from "sonner";
-import { ethers, parseEther } from "ethers";
 import {
   useAccount,
   usePublicClient,
   useSendTransaction,
   useWalletClient,
 } from "wagmi";
+import { parseEther } from "viem";
+import { formatCurrency } from "@/lib/utils";
 
 type JackpotStep = "overview" | "loading" | "confirm" | "entered" | "result";
 type PaymentOption = "USD" | "AVAX";
@@ -182,6 +183,11 @@ const Jackpot = () => {
 
     setIsPaying(true);
     try {
+      if (jackpotAddress.toLowerCase() === address.toLowerCase()) {
+        toast.error("The toWallet and fromWallet can't be same.");
+        return;
+      }
+
       if (paymentOption === "AVAX") {
         if (!walletClient || !publicClient) {
           throw new Error("Wallet not ready");
@@ -221,11 +227,16 @@ const Jackpot = () => {
           jackpotId: currentJackpot.id,
         });
       } else {
-        // Pay in USD (off-chain) – fixed $1 entry, reported via API
+        const amountUsd = Number(currentJackpot.minAmount);
+        if (!Number.isFinite(amountUsd) || amountUsd <= 0) {
+          throw new Error("Invalid jackpot USD amount.");
+        }
+
+        // Pay in USD (off-chain) and report transfer destination wallet via API
         await submitJackpotTransfer({
           fromWallet: address,
           toWallet: jackpotAddress,
-          amount: 1,
+          amount: amountUsd,
           currency: "USD",
           txHash: "",
           network: chainId,
@@ -238,7 +249,11 @@ const Jackpot = () => {
       setStep("entered");
     } catch (error) {
       console.error("Jackpot payment failed:", error);
-      toast.error("Payment failed. Please try again.");
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Payment failed. Please try again.";
+      toast.error(message);
     } finally {
       setIsPaying(false);
     }
@@ -546,7 +561,7 @@ const Jackpot = () => {
                                 <p className="text-2xl font-bold text-foreground">
                                   {poolData
                                     ? `$${poolData.totalPoolUSD.toFixed(2)}`
-                                    : "$2"}
+                                    : "$1"}
                                 </p>
                                 <p className="text-xs text-muted-foreground">
                                   Total Pool
@@ -735,8 +750,8 @@ const Jackpot = () => {
                           </span>
                           <span className="text-foreground font-bold">
                             {currentJackpot
-                              ? `${currentJackpot.minAmount} ${currentJackpot.currency}`
-                              : "$2"}
+                              ? `${formatCurrency(currentJackpot.minAmount)} ${currentJackpot.currency}`
+                              : "$1"}
                           </span>
                         </div>
                         <div className="flex justify-between items-center mb-4">
@@ -752,8 +767,8 @@ const Jackpot = () => {
                             </span>
                             <span className="text-primary font-bold text-xl">
                               {currentJackpot
-                                ? `${currentJackpot.minAmount} ${currentJackpot.currency}`
-                                : "$2"}
+                                ? `${formatCurrency(currentJackpot.minAmount)} ${currentJackpot.currency}`
+                                : "$1"}
                             </span>
                           </div>
                         </div>
@@ -764,7 +779,7 @@ const Jackpot = () => {
                         <p className="text-sm font-medium text-foreground mb-2">
                           Select payment option
                         </p>
-                        <button
+                        {/* <button
                           type="button"
                           onClick={() => setPaymentOption("USD")}
                           className={`w-full flex items-center justify-between px-4 py-3 rounded-lg border text-sm ${
@@ -777,10 +792,14 @@ const Jackpot = () => {
                           {paymentOption === "USD" && (
                             <CheckCircle className="w-4 h-4 text-primary" />
                           )}
-                        </button>
+                        </button> */}
                         <button
                           type="button"
-                          onClick={() => setPaymentOption("AVAX")}
+                          onClick={() =>
+                            setPaymentOption(
+                              currentJackpot.currency as PaymentOption,
+                            )
+                          }
                           className={`w-full flex items-center justify-between px-4 py-3 rounded-lg border text-sm ${
                             paymentOption === "AVAX"
                               ? "border-primary bg-primary/10 text-foreground"
@@ -790,7 +809,7 @@ const Jackpot = () => {
                           <span>
                             Pay{" "}
                             {currentJackpot
-                              ? `${currentJackpot.minAmount} ${currentJackpot.currency}`
+                              ? `${formatCurrency(currentJackpot.minAmount)} ${currentJackpot.currency}`
                               : "min amount in AVAX"}
                           </span>
                           {paymentOption === "AVAX" && (
@@ -974,7 +993,7 @@ const Jackpot = () => {
                       1
                     </span>
                     <span className="text-sm text-muted-foreground">
-                      Pay $2 entry fee
+                      Pay $1 entry fee
                     </span>
                   </li>
                   <li className="flex gap-3">

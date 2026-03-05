@@ -7,13 +7,13 @@ const SHADOWPAY_BASE_URL = "https://shadow.radr.fun/shadowpay/api/escrow";
 /**
  * Request deposit transaction from ShadowPay
  * @param wallet - Wallet address
- * @param amount - Amount in SOL (not lamports)
+ * @param amount - Amount in AVAX (not lamports)
  */
 export const requestDepositTx = async (wallet: string, amount: number) => {
   try {
     const response = await axios.post(`${SHADOWPAY_BASE_URL}/deposit`, {
       wallet,
-      amount, // Amount in SOL as per ShadowPay docs
+      amount, // Amount in AVAX as per ShadowPay docs
     });
     return response.data;
   } catch (error) {
@@ -25,13 +25,13 @@ export const requestDepositTx = async (wallet: string, amount: number) => {
 /**
  * Request withdraw transaction from ShadowPay
  * @param wallet - Wallet address
- * @param amount - Amount in SOL (not lamports)
+ * @param amount - Amount in AVAX (not lamports)
  */
 export const requestWithdrawTx = async (wallet: string, amount: number) => {
   try {
     const response = await axios.post(`${SHADOWPAY_BASE_URL}/withdraw`, {
       wallet,
-      amount, // Amount in SOL as per ShadowPay docs
+      amount, // Amount in AVAX as per ShadowPay docs
     });
     return response.data;
   } catch (error) {

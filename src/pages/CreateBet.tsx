@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { ChangeEvent, useState } from "react";
 import { motion } from "framer-motion";
 import { Link, useNavigate } from "react-router-dom";
 import {
@@ -16,14 +16,42 @@ import { Label } from "@/components/ui/label";
 import Layout from "@/components/layout/Layout";
 import GlowCard from "@/components/ui/GlowCard";
 import { createBet } from "@/queries/BetApis";
+import {
+  useWriteContract,
+  useWaitForTransactionReceipt,
+  useAccount,
+  useSendTransaction,
+  useWalletClient,
+  usePublicClient,
+} from "wagmi";
+import { parseEther } from "viem";
+import { BETTING_CONTRACT_ABI } from "@/config/bettingContract";
+import { useNetwork } from "@/contexts/NetworkContext";
+import { toast } from "sonner";
 
 const CreateBet = () => {
   const navigate = useNavigate();
+
+  const { isConnected, address } = useAccount();
+  const { chainId } = useNetwork();
+  const { data: walletClient } = useWalletClient();
+  const publicClient = usePublicClient();
+  const { sendTransactionAsync } = useSendTransaction();
+
   const [step, setStep] = useState(1);
   const [isCreating, setIsCreating] = useState(false);
   const [betCreated, setBetCreated] = useState(false);
+  const [isPaying, setIsPaying] = useState(false);
   const [createdBetLink, setCreatedBetLink] = useState<string | null>(null);
   const [inviteHandle, setInviteHandle] = useState<string>("");
+
+  const { data: hash, writeContractAsync } = useWriteContract();
+  const { isLoading: isConfirming, isSuccess: isConfirmed } =
+    useWaitForTransactionReceipt({
+      hash,
+    });
+
+  const bettingAddress = "0xC13a8bE56C8C26AEa587C20cdeFf27529C085eD8";
 
   const [formData, setFormData] = useState({
     competitorA: "",
@@ -31,10 +59,14 @@ const CreateBet = () => {
     description: "",
     endCondition: "",
     stakeAmount: "",
+    currency: "AVAX",
+    startAt: new Date().toISOString(),
+    endAt: new Date().toISOString(),
+    side: "A",
   });
 
   const handleInputChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
+    e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
   ) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
@@ -47,10 +79,57 @@ const CreateBet = () => {
     setStep(step - 1);
   };
 
+  const handlePay = async (stakeAmount: string) => {
+    if (!isConnected && !address) {
+      toast.error("Please connect your Avalanche wallet first.");
+      return;
+    }
+
+    if (bettingAddress == address) {
+      toast.error("The toWallet and fromWallet can't be same.");
+      return;
+    }
+
+    setIsPaying(true);
+    try {
+      if (!walletClient || !publicClient) {
+        throw new Error("Wallet not ready");
+      }
+
+      const amount = Number(stakeAmount);
+      if (!Number.isFinite(amount) || amount <= 0) {
+        throw new Error("Invalid jackpot minimum amount.");
+      }
+      const valueWei = parseEther(stakeAmount);
+
+      const hash = await sendTransactionAsync({
+        to: bettingAddress as `0x${string}`,
+        value: valueWei,
+      });
+
+      toast.info("Transaction submitted. Waiting for confirmation...");
+
+      // Wait for confirmation
+      const receipt = await publicClient.waitForTransactionReceipt({
+        hash,
+      });
+
+      if (receipt.status !== "success") {
+        throw new Error("Transaction failed on chain.");
+      }
+    } catch (error) {
+      console.error("Jackpot payment failed:", error);
+      toast.error("Payment failed. Please try again.");
+    } finally {
+      setIsPaying(false);
+    }
+  };
+
   const handleCreateBet = async () => {
     try {
       setIsCreating(true);
 
+      // 1. Save Bet to Backend DB (creates UUID needed for smart contract)
       const payload = {
         title: `${formData.competitorA} vs ${formData.competitorB}`,
         description: formData.description,
@@ -59,14 +138,32 @@ const CreateBet = () => {
         endCondition: formData.endCondition,
         stakeAmount: Number(formData.stakeAmount),
         currency: "AVAX",
-        status: "pending" as const,
-        startAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(),
-        endAt: new Date(Date.now() + 1 * 24 * 60 * 60 * 1000).toISOString(),
+        status: "live" as const,
+        startAt: formData.startAt,
+        endAt: formData.endAt,
+        side: formData.side,
       };
 
-      const res = await createBet(payload);
+      await handlePay(formData.stakeAmount);
 
+      const res = await createBet(payload);
       const betId = res?.data?.id;
+      // const contractAddress = res?.data?.contractAddress;
+
+      // console.log("Contract Address:", contractAddress);
+
+      if (!betId) throw new Error("Backend failed to create bet");
+
+      // // 2. Send Smart Contract Transaction
+      // const txHash = await writeContractAsync({
+      //   address: contractAddress as `0x${string}`,
+      //   abi: BETTING_CONTRACT_ABI.abi as any,
+      //   functionName: "placeBet",
+      //   args: [1], // Creator defaults to side 1 (A)
+      //   value: parseEther(formData.stakeAmount),
+      // });
+
+      // console.log("Create Bet TX Hash:", txHash);
 
       const shareLink = `${window.location.origin}/betting/${betId}`;
 
@@ -110,6 +207,22 @@ const CreateBet = () => {
                 </p>
 
                 <div className="bg-secondary/50 rounded-lg p-6 mb-8 max-w-md mx-auto text-left">
+                  {hash && (
+                    <div className="mb-4 p-3 bg-primary/10 border border-primary/30 rounded-lg">
+                      <p className="text-sm text-muted-foreground mb-1">
+                        Transaction Hash:
+                      </p>
+                      <a
+                        href={`https://subnets-test.avax.network/c-chain/tx/${hash}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-xs font-mono text-primary break-all hover:underline"
+                      >
+                        {hash}
+                      </a>
+                    </div>
+                  )}
+
                   <p className="text-sm text-muted-foreground mb-2">
                     Share this link
                   </p>
@@ -179,14 +292,10 @@ const CreateBet = () => {
                         onClick={() => {
                           const handle = inviteHandle.trim().replace(/^@/, "");
                           if (!handle) return;
-                          const link =
-                            createdBetLink ??
-                            `${window.location.origin}/betting/abc123`;
                           const text = encodeURIComponent(
-                            `Hey @${handle}, I just created a bet on RicheeRich: ${formData.competitorA} vs ${formData.competitorB}. Join me here 👇`,
+                            `Hey @${handle}, I just created a bet on MoneyKicks: ${formData.competitorA} vs ${formData.competitorB}. Join me here 👇\n${createdBetLink}`,
                           );
-                          const url = encodeURIComponent(link);
-                          const shareUrl = `https://twitter.com/intent/tweet?text=${text}&url=${url}`;
+                          const shareUrl = `https://twitter.com/messages/compose?text=${text}`;
                           window.open(
                             shareUrl,
                             "_blank",
@@ -218,6 +327,10 @@ const CreateBet = () => {
                         description: "",
                         endCondition: "",
                         stakeAmount: "",
+                        currency: "AVAX",
+                        startAt: new Date().toISOString(),
+                        endAt: new Date().toISOString(),
+                        side: "A",
                       });
                     }}
                     className="border-border text-muted-foreground hover:bg-secondary"
@@ -309,7 +422,7 @@ const CreateBet = () => {
                       value={formData.competitorA}
                       onChange={handleInputChange}
                       placeholder="e.g., Bitcoin (BTC)"
-                      className="mt-2 bg-secondary border-border text-foreground placeholder:text-muted-foreground"
+                      className="mt-2 bg-secondary/50 border-border/50 text-foreground placeholder:text-muted-foreground focus:border-primary/50 focus:ring-1 focus:ring-primary/50 transition-all"
                     />
                   </div>
                   <div>
@@ -322,7 +435,7 @@ const CreateBet = () => {
                       value={formData.competitorB}
                       onChange={handleInputChange}
                       placeholder="e.g., Ethereum (ETH)"
-                      className="mt-2 bg-secondary border-border text-foreground placeholder:text-muted-foreground"
+                      className="mt-2 bg-secondary/50 border-border/50 text-foreground placeholder:text-muted-foreground focus:border-primary/50 focus:ring-1 focus:ring-primary/50 transition-all"
                     />
                   </div>
                 </div>
@@ -367,7 +480,7 @@ const CreateBet = () => {
                       onChange={handleInputChange}
                       placeholder="Describe what this bet is about..."
                       rows={4}
-                      className="mt-2 bg-secondary border-border text-foreground placeholder:text-muted-foreground"
+                      className="mt-2 bg-secondary/50 border-border/50 text-foreground placeholder:text-muted-foreground focus:border-primary/50 focus:ring-1 focus:ring-primary/50 transition-all resize-none"
                     />
                   </div>
                   <div>
@@ -380,11 +493,38 @@ const CreateBet = () => {
                       value={formData.endCondition}
                       onChange={handleInputChange}
                       placeholder="e.g., March 31, 2024 at 11:59 PM UTC"
-                      className="mt-2 bg-secondary border-border text-foreground placeholder:text-muted-foreground"
+                      className="mt-2 bg-secondary/50 border-border/50 text-foreground placeholder:text-muted-foreground focus:border-primary/50 focus:ring-1 focus:ring-primary/50 transition-all"
                     />
                     <p className="text-xs text-muted-foreground mt-2">
                       Specify when and how the winner will be determined
                     </p>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6  ">
+                    <div>
+                      <Label>Start Date & Time</Label>
+                      <div className="relative flex items-center mt-2">
+                        <Input
+                          type="datetime-local"
+                          name="startAt"
+                          value={formData.startAt}
+                          onChange={handleInputChange}
+                          className="w-full bg-secondary/50 border-border/50 text-foreground [color-scheme:dark] focus:border-primary/50 focus:ring-1 focus:ring-primary/50 transition-all"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <Label>End Date & Time</Label>
+                      <div className="relative flex items-center mt-2">
+                        <Input
+                          type="datetime-local"
+                          name="endAt"
+                          value={formData.endAt}
+                          onChange={handleInputChange}
+                          className="w-full bg-secondary/50 border-border/50 text-foreground [color-scheme:dark] focus:border-primary/50 focus:ring-1 focus:ring-primary/50 transition-all"
+                        />
+                      </div>
+                    </div>
                   </div>
                 </div>
 
@@ -423,10 +563,45 @@ const CreateBet = () => {
                   </div>
                 </div>
 
+                <div className="mb-6">
+                  <Label>Currency</Label>
+                  <div className="relative">
+                    <select
+                      name="currency"
+                      value={formData.currency}
+                      onChange={(e) =>
+                        setFormData((prev) => ({
+                          ...prev,
+                          currency: e.target.value,
+                        }))
+                      }
+                      className="w-full mt-2 rounded-md bg-secondary/50 border border-border/50 px-3 py-2 text-foreground focus:outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/50 transition-all appearance-none cursor-pointer"
+                    >
+                      <option value="AVAX">AVAX</option>
+                      <option value="USDC">USD</option>
+                    </select>
+                    <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 pt-2 text-muted-foreground">
+                      <svg
+                        className="h-4 w-4"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth="2"
+                          d="M19 9l-7 7-7-7"
+                        />
+                      </svg>
+                    </div>
+                  </div>
+                </div>
+
                 <div className="space-y-6">
                   <div>
                     <Label htmlFor="stakeAmount" className="text-foreground">
-                      Stake Amount (SOL)
+                      Stake Amount ({formData.currency})
                     </Label>
                     <Input
                       id="stakeAmount"
@@ -435,44 +610,83 @@ const CreateBet = () => {
                       value={formData.stakeAmount}
                       onChange={handleInputChange}
                       placeholder="e.g., 100"
-                      className="mt-2 bg-secondary border-border text-foreground placeholder:text-muted-foreground"
+                      className="mt-2 bg-secondary/50 border-border/50 text-foreground placeholder:text-muted-foreground focus:border-primary/50 focus:ring-1 focus:ring-primary/50 transition-all"
                     />
                     <p className="text-xs text-muted-foreground mt-2">
                       Both competitors will stake this amount
                     </p>
                   </div>
 
+                  {/* In Favor / Against Toggle */}
+                  <div className="mb-6">
+                    <Label className="text-foreground mb-2 block">
+                      Choose Your Position
+                    </Label>
+
+                    <div
+                      className="relative w-full h-12 rounded-lg bg-secondary/50 border border-border/50 cursor-pointer flex items-center p-1"
+                      onClick={() =>
+                        setFormData((prev) => ({
+                          ...prev,
+                          side: prev.side === "A" ? "B" : "A",
+                        }))
+                      }
+                    >
+                      {/* Sliding Background */}
+                      <div
+                        className={`absolute top-1 bottom-1 w-1/2 rounded-md bg-primary transition-all duration-300 ${
+                          formData.side === "A" ? "left-1" : "left-1/2"
+                        }`}
+                      />
+
+                      {/* Labels */}
+                      <div className="relative z-10 w-1/2 text-center font-semibold">
+                        <span
+                          className={
+                            formData.side === "A"
+                              ? "text-primary-foreground"
+                              : "text-muted-foreground"
+                          }
+                        >
+                          In Favor
+                        </span>
+                      </div>
+
+                      <div className="relative z-10 w-1/2 text-center font-semibold">
+                        <span
+                          className={
+                            formData.side === "B"
+                              ? "text-primary-foreground"
+                              : "text-muted-foreground"
+                          }
+                        >
+                          Against
+                        </span>
+                      </div>
+                    </div>
+
+                    <p className="text-xs text-muted-foreground mt-2">
+                      {formData.side === "A"
+                        ? `You are betting on ${formData.competitorA}`
+                        : `You are betting on ${formData.competitorB}`}
+                    </p>
+                  </div>
+
                   {/* Summary */}
-                  <div className="bg-secondary/50 rounded-lg p-6 mt-8">
-                    <h3 className="font-semibold text-foreground mb-4">
-                      Bet Summary
-                    </h3>
-                    <div className="space-y-3 text-sm">
+                  <div className="bg-secondary/50 rounded-lg p-6">
+                    <h3 className="font-semibold mb-4">Bet Summary</h3>
+
+                    <div className="space-y-2 text-sm">
                       <div className="flex justify-between">
-                        <span className="text-muted-foreground">
-                          Competitor A
-                        </span>
-                        <span className="text-foreground">
-                          {formData.competitorA}
-                        </span>
+                        <span>{formData.competitorA}</span> VS
+                        <span>{formData.competitorB}</span>
                       </div>
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">
-                          Competitor B
-                        </span>
-                        <span className="text-foreground">
-                          {formData.competitorB}
-                        </span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">
-                          Total Stake
-                        </span>
-                        <span className="text-primary font-bold">
-                          {formData.stakeAmount
-                            ? Number(formData.stakeAmount) * 2
-                            : 0}{" "}
-                          SOL
+
+                      <div className="flex justify-between font-bold text-primary">
+                        <span>Total Stake</span>
+                        <span>
+                          {Number(formData.stakeAmount || 0) * 2}{" "}
+                          {formData.currency}
                         </span>
                       </div>
                     </div>
@@ -489,10 +703,16 @@ const CreateBet = () => {
                   </Button>
                   <Button
                     onClick={handleCreateBet}
-                    disabled={!isStep3Valid || isCreating}
+                    disabled={
+                      !isStep3Valid || isCreating || isConfirming || isPaying
+                    }
                     className="bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
                   >
-                    {isCreating ? "Creating..." : "Create Bet"}
+                    {isConfirming
+                      ? "Confirming tx..."
+                      : isCreating || isPaying
+                        ? "Creating..."
+                        : "Create Bet"}
                   </Button>
                 </div>
               </GlowCard>

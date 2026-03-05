@@ -15,6 +15,9 @@ export interface JackpotItem {
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
+  walletAddress?: string;
+  avaxWalletAddress?: string;
+  usdWalletAddress?: string;
   // Optional fields we may get from backend
   participants?: string[];
   hasParticipated?: boolean;

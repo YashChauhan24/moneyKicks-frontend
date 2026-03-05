@@ -26,7 +26,7 @@ const USDC_MINT_ADDRESSES = [
  * Get USDC balance for a wallet
  * Tries multiple methods to find USDC token accounts
  * Returns 0 if token account doesn't exist or if there's an error
- * @param connection - Solana Connection (should be for the correct network)
+ * @param connection - Avalanche Connection (should be for the correct network)
  * @param walletAddress - Wallet public key address
  * @param network - Network type to determine which USDC mint to look for
  */

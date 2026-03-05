@@ -18,6 +18,14 @@ import Layout from "@/components/layout/Layout";
 import GlowCard from "@/components/ui/GlowCard";
 
 import { getBetById, ApiBet, makePrediction } from "@/queries/BetApis";
+import {
+  useAccount,
+  useWalletClient,
+  usePublicClient,
+  useSendTransaction,
+} from "wagmi";
+import { parseEther } from "viem";
+import { toast } from "sonner";
 
 type BetViewStep = "view" | "predict" | "confirmed";
 
@@ -26,12 +34,27 @@ const BetDetail = () => {
 
   const [bet, setBet] = useState<ApiBet | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isParticipated, setIsParticipated] = useState(false);
 
   const [step, setStep] = useState<BetViewStep>("view");
   const [selectedCompetitor, setSelectedCompetitor] = useState<
     "A" | "B" | null
   >(null);
   const [betAmount, setBetAmount] = useState("");
+
+  const { data: walletClient } = useWalletClient();
+  const publicClient = usePublicClient();
+  const { sendTransactionAsync } = useSendTransaction();
+  const { address, isConnected } = useAccount();
+
+  const bettingAddress = "0xC13a8bE56C8C26AEa587C20cdeFf27529C085eD8";
+
+  // Enforce the strict stake amount mandated by the smart contract
+  useEffect(() => {
+    if (bet?.stakeAmount) {
+      setBetAmount(bet.stakeAmount.toString());
+    }
+  }, [bet]);
 
   // ✅ Fetch bet from API layer
   useEffect(() => {
@@ -86,10 +109,44 @@ const BetDetail = () => {
   const handleMakePrediction = () => setStep("predict");
 
   const handleConfirmPrediction = async () => {
-    if (!id || !selectedCompetitor || !betAmount) return;
-
+    if (!bet) {
+      toast.error("Bet details not loaded.");
+      return;
+    }
+    if (!isConnected || !address) {
+      toast.error("Please connect your Avalanche wallet first.");
+      return;
+    }
+    if (bettingAddress.toLowerCase() === address.toLowerCase()) {
+      toast.error("The toWallet and fromWallet can't be same.");
+      return;
+    }
+    setIsParticipated(true);
     try {
-      setLoading(true);
+      if (!walletClient || !publicClient) {
+        throw new Error("Wallet not ready");
+      }
+
+      const amountAvax = Number(bet.stakeAmount);
+      if (!Number.isFinite(amountAvax) || amountAvax <= 0) {
+        throw new Error("Invalid Betting stake amount.");
+      }
+
+      const valueWei = parseEther(amountAvax.toString());
+
+      // Send transaction
+      const hash = await sendTransactionAsync({
+        to: bettingAddress as `0x${string}`,
+        value: valueWei,
+      });
+
+      // Wait for confirmation
+      const receipt = await publicClient.waitForTransactionReceipt({ hash });
+
+      if (!receipt.status) {
+        toast.error("Transaction failed");
+        return;
+      }
 
       await makePrediction(id, {
         side: selectedCompetitor,
@@ -97,10 +154,16 @@ const BetDetail = () => {
       });
 
       setStep("confirmed");
-    } catch (err) {
-      console.error("Prediction failed:", err);
+      toast.success("Entry submitted successfully!");
+    } catch (error) {
+      console.error("Jackpot payment failed:", error);
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Payment failed. Please try again.";
+      toast.error(message);
     } finally {
-      setLoading(false);
+      setIsParticipated(false);
     }
   };
 
@@ -312,12 +375,21 @@ const BetDetail = () => {
                     </button>
                   </div>
 
-                  <Input
-                    type="number"
-                    value={betAmount}
-                    onChange={(e) => setBetAmount(e.target.value)}
-                    placeholder="Enter amount..."
-                  />
+                  <div className="mb-6">
+                    <label className="text-sm text-muted-foreground mb-2 block">
+                      Fixed Stake Amount
+                    </label>
+                    <Input
+                      type="number"
+                      value={betAmount}
+                      disabled
+                      className="bg-secondary/50 font-bold"
+                    />
+                    <p className="text-xs text-muted-foreground mt-2">
+                      The smart contract requires exactly {betAmount} AVAX to
+                      participate.
+                    </p>
+                  </div>
 
                   {selectedCompetitor && betAmount && (
                     <div className="mt-6 text-success font-bold">
@@ -328,9 +400,18 @@ const BetDetail = () => {
                   <div className="flex gap-4 mt-6">
                     <Button
                       onClick={handleConfirmPrediction}
-                      disabled={!selectedCompetitor || !betAmount || loading}
+                      disabled={
+                        !selectedCompetitor ||
+                        !betAmount ||
+                        loading ||
+                        isParticipated
+                      }
                     >
-                      {loading ? "Placing..." : "Confirm Prediction"}
+                      {isParticipated
+                        ? "Confirming tx..."
+                        : loading
+                          ? "Placing..."
+                          : "Confirm Prediction"}
                     </Button>
 
                     <Button variant="outline" onClick={handleReset}>
@@ -343,16 +424,77 @@ const BetDetail = () => {
 
             {/* ================= CONFIRMED STEP ================= */}
             {step === "confirmed" && (
-              <motion.div key="confirmed">
+              <motion.div
+                key="confirmed"
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+              >
                 <GlowCard className="text-center py-16">
-                  <CheckCircle className="w-24 h-24 mx-auto mb-6 text-success" />
-                  <h2 className="text-3xl font-bold mb-4">
-                    Prediction Placed!
+                  <motion.div
+                    initial={{ scale: 0 }}
+                    animate={{ scale: 1 }}
+                    transition={{ delay: 0.2, type: "spring" }}
+                  >
+                    <CheckCircle className="w-24 h-24 text-success mx-auto mb-6" />
+                  </motion.div>
+                  <h2 className="text-3xl font-bold text-foreground mb-4">
+                    Prediction Placed! 🎯
                   </h2>
+                  <p className="text-muted-foreground mb-8 max-w-md mx-auto">
+                    Your prediction has been recorded. You'll receive your
+                    payout if{" "}
+                    {selectedCompetitor === "A"
+                      ? bet.competitorAName
+                      : bet.competitorBName}{" "}
+                    wins.
+                  </p>
 
-                  <Link to="/betting">
-                    <Button>Browse More Bets</Button>
-                  </Link>
+                  <div className="bg-secondary/50 rounded-lg p-6 mb-8 max-w-sm mx-auto">
+                    <div className="space-y-3 text-left">
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">
+                          Bet Amount
+                        </span>
+                        <span className="text-foreground font-bold">
+                          ${betAmount}
+                        </span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">
+                          Predicted Winner
+                        </span>
+                        <span className="text-foreground font-bold">
+                          {selectedCompetitor === "A"
+                            ? bet.competitorAName
+                            : bet.competitorBName}
+                        </span>
+                      </div>
+                      <div className="flex justify-between border-t border-border pt-3">
+                        <span className="text-muted-foreground">
+                          Potential Payout
+                        </span>
+                        <span className="text-success font-bold">
+                          ${calculatePayout()}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col sm:flex-row gap-4 justify-center">
+                    <Link to="/betting">
+                      <Button className="bg-primary text-primary-foreground hover:bg-primary/90">
+                        Browse More Bets
+                      </Button>
+                    </Link>
+                    <Link to="/">
+                      <Button
+                        variant="outline"
+                        className="border-border text-muted-foreground hover:bg-secondary"
+                      >
+                        Back to Dashboard
+                      </Button>
+                    </Link>
+                  </div>
                 </GlowCard>
               </motion.div>
             )}

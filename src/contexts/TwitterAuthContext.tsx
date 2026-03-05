@@ -112,10 +112,7 @@ export const TwitterAuthProvider = ({ children }: TwitterAuthProviderProps) => {
 export const useTwitterAuth = (): TwitterAuthContextType => {
   const context = useContext(TwitterAuthContext);
   if (!context) {
-    throw new Error(
-      "useTwitterAuth must be used within a TwitterAuthProvider",
-    );
+    throw new Error("useTwitterAuth must be used within a TwitterAuthProvider");
   }
   return context;
 };
-

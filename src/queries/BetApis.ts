@@ -13,7 +13,7 @@ export type CreateBetPayload = {
   currency: string;
   endAt: string;
   startAt: string;
-  status: "pending";
+  status: "live";
 };
 
 export interface ApiBetStats {
@@ -36,6 +36,7 @@ export interface ApiBet {
   startAt: string;
   endAt: string;
   createdByUserId: string;
+  contractAddress?: string;
   createdAt: string;
   updatedAt: string;
   stats?: ApiBetStats;
@@ -56,13 +57,13 @@ export const createBet = async (payload: CreateBetPayload) => {
   try {
     const token = localStorage.getItem("twitter_token"); // assuming you store JWT
 
-    const response = await axios.post(`${API_BASE_URL}/bets`, payload, {
+    const { data } = await axios.post(`${API_BASE_URL}/bets`, payload, {
       headers: {
         Authorization: `Bearer ${token}`,
       },
     });
 
-    return response.data;
+    return data;
   } catch (error) {
     console.error("Failed to create bet:", error);
     throw error;
@@ -72,7 +73,7 @@ export const createBet = async (payload: CreateBetPayload) => {
 export const getBets = async (
   params?: GetBetsParams,
 ): Promise<GetBetsResponse> => {
-  const response = await axios.get<GetBetsResponse>(`${API_BASE_URL}/bets`, {
+  const { data } = await axios.get<GetBetsResponse>(`${API_BASE_URL}/bets`, {
     params: {
       limit: params?.limit ?? 20,
       offset: params?.offset ?? 0,
@@ -81,15 +82,15 @@ export const getBets = async (
     },
   });
 
-  return response.data;
+  return data;
 };
 
 export const getBetById = async (id: string): Promise<{ data: ApiBet }> => {
-  const response = await axios.get<{ data: ApiBet }>(
+  const { data } = await axios.get<{ data: ApiBet }>(
     `${API_BASE_URL}/bets/${id}`,
   );
 
-  return response.data;
+  return data;
 };
 
 export const makePrediction = async (
@@ -98,7 +99,7 @@ export const makePrediction = async (
 ) => {
   const token = localStorage.getItem("twitter_token");
 
-  const res = await axios.post(
+  const { data } = await axios.post(
     `${API_BASE_URL}/bets/${betId}/predictions`,
     payload,
     {
@@ -108,5 +109,5 @@ export const makePrediction = async (
     },
   );
 
-  return res.data;
+  return data;
 };

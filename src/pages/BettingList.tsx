@@ -17,7 +17,9 @@ import { Input } from "@/components/ui/input";
 import Layout from "@/components/layout/Layout";
 import GlowCard from "@/components/ui/GlowCard";
 import StatCard from "@/components/ui/StatCard";
+import { formatCurrency } from "@/lib/utils";
 import { getBets } from "@/queries/BetApis";
+import { fetchDashboard, DashboardStats } from "@/queries/DashboardApis";
 
 interface Bet {
   id: string;
@@ -30,6 +32,7 @@ interface Bet {
   poolB: number;
   status: "pending" | "live" | "closed" | "settled";
   endsAt: string;
+  currency: string;
 }
 
 const BettingList = () => {
@@ -39,20 +42,25 @@ const BettingList = () => {
   const [filter, setFilter] = useState<"all" | "live" | "pending" | "settled">(
     "all",
   );
+  const [stats, setStats] = useState<DashboardStats | null>(null);
 
   useEffect(() => {
-    const fetchBets = async () => {
+    const fetchBetsAndStats = async () => {
       try {
         setLoading(true);
 
-        const res = await getBets({
-          status: filter as "pending" | "live" | "closed" | "settled",
-          search: searchQuery || undefined,
-          limit: 20,
-          offset: 0,
-        });
+        const [betsRes, dashboardRes] = await Promise.all([
+          getBets({
+            status: filter as "pending" | "live" | "closed" | "settled",
+            search: searchQuery || undefined,
+            limit: 20,
+            offset: 0,
+          }),
+          fetchDashboard(),
+        ]);
 
-        const mappedBets: Bet[] = res.data.map((item) => ({
+        console.log({ betsRes });
+        const mappedBets: Bet[] = betsRes.data.map((item) => ({
           id: item.id,
           title: item.title,
           competitorA: item.competitorAName,
@@ -63,10 +71,12 @@ const BettingList = () => {
           poolB: Number(item.stats?.totalOnB ?? 0),
           status: item.status, // API returns PENDING
           endsAt: item.endAt?.split("T")[0],
+          currency: item.currency || "USD",
         }));
 
         console.log(mappedBets);
         setBets(mappedBets);
+        setStats(dashboardRes.stats);
       } catch (error) {
         console.error(error);
       } finally {
@@ -74,7 +84,7 @@ const BettingList = () => {
       }
     };
 
-    fetchBets();
+    fetchBetsAndStats();
   }, [filter, searchQuery]);
 
   const filteredBets = bets.filter((bet) => {
@@ -132,19 +142,19 @@ const BettingList = () => {
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 mb-8">
             <StatCard
               title="Total Active Bets"
-              value="156"
+              value={(stats?.activeBets || 0).toLocaleString()}
               icon={Target}
               color="primary"
             />
             <StatCard
               title="Total Prediction Pool"
-              value="$2.4M"
+              value={`$${formatCurrency(stats?.totalValueLocked || 0)}`}
               icon={TrendingUp}
               color="primary"
             />
             <StatCard
               title="Active Predictors"
-              value="12,456"
+              value={(stats?.activeUsers || 0).toLocaleString()}
               icon={Users}
               color="success"
             />
@@ -228,7 +238,7 @@ const BettingList = () => {
                         {bet.competitorA}
                       </p>
                       <p className="text-lg font-bold text-primary">
-                        ${bet.poolA.toLocaleString()}
+                        {formatCurrency(bet.poolA)} {bet.currency}
                       </p>
                       <p className="text-xs text-muted-foreground">
                         prediction pool
@@ -242,7 +252,7 @@ const BettingList = () => {
                         {bet.competitorB}
                       </p>
                       <p className="text-lg font-bold text-primary">
-                        ${bet.poolB.toLocaleString()}
+                        {formatCurrency(bet.poolB)} {bet.currency}
                       </p>
                       <p className="text-xs text-muted-foreground">
                         prediction pool
@@ -252,7 +262,9 @@ const BettingList = () => {
 
                   {/* Stats */}
                   <div className="flex items-center justify-between text-sm text-muted-foreground mb-6">
-                    <span>Stake: ${bet.totalStake.toLocaleString()}</span>
+                    <span>
+                      Stake: {formatCurrency(bet.totalStake)} {bet.currency}
+                    </span>
                     <span>{bet.predictorCount} predictors</span>
                   </div>
 
