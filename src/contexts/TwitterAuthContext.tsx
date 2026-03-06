@@ -1,8 +1,10 @@
 import {
+  useCallback,
   createContext,
   ReactNode,
   useContext,
   useEffect,
+  useMemo,
   useState,
 } from "react";
 import {
@@ -33,6 +35,7 @@ interface TwitterAuthProviderProps {
 }
 
 export const TwitterAuthProvider = ({ children }: TwitterAuthProviderProps) => {
+  const TWITTER_AUTH_REDIRECT_KEY = "twitter_auth_redirect";
   const [user, setUser] = useState<AuthUser | null>(null);
   const [token, setToken] = useState<string | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
@@ -57,18 +60,21 @@ export const TwitterAuthProvider = ({ children }: TwitterAuthProviderProps) => {
     setInitialized(true);
   }, []);
 
-  const startTwitterLogin = async (_redirectPath?: string) => {
+  const startTwitterLogin = useCallback(async (redirectPath?: string) => {
     try {
       setLoading(true);
+      if (redirectPath) {
+        window.sessionStorage.setItem(TWITTER_AUTH_REDIRECT_KEY, redirectPath);
+      }
       const authUrl = await getTwitterLoginUrl();
       window.location.href = authUrl;
     } catch (error) {
       console.error("Failed to start Twitter login:", error);
       setLoading(false);
     }
-  };
+  }, []);
 
-  const completeCallback = async (
+  const completeCallback = useCallback(async (
     oauthToken: string,
     oauthVerifier: string,
   ) => {
@@ -83,24 +89,27 @@ export const TwitterAuthProvider = ({ children }: TwitterAuthProviderProps) => {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
-  const logout = () => {
+  const logout = useCallback(() => {
     setToken(null);
     setUser(null);
     window.localStorage.removeItem("twitter_token");
     window.localStorage.removeItem("twitter_user");
-  };
+  }, []);
 
-  const value: TwitterAuthContextType = {
-    user,
-    token,
-    isAuthenticated: !!user,
-    loading: loading && !initialized,
-    startTwitterLogin,
-    completeCallback,
-    logout,
-  };
+  const value: TwitterAuthContextType = useMemo(
+    () => ({
+      user,
+      token,
+      isAuthenticated: !!user,
+      loading: loading && !initialized,
+      startTwitterLogin,
+      completeCallback,
+      logout,
+    }),
+    [user, token, loading, initialized, startTwitterLogin, completeCallback, logout],
+  );
 
   return (
     <TwitterAuthContext.Provider value={value}>

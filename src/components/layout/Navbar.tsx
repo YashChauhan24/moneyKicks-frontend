@@ -46,7 +46,8 @@ const Navbar = () => {
   const displayAddress = address ? truncateAddress(address) : "";
 
   const handleTwitterLogin = () => {
-    void startTwitterLogin(location.pathname);
+    const redirectPath = `${location.pathname}${location.search}${location.hash}`;
+    void startTwitterLogin(redirectPath);
   };
 
   const handleTwitterLogout = () => {
