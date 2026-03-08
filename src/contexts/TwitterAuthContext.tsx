@@ -12,6 +12,7 @@ import {
   getTwitterLoginUrl,
   completeTwitterLogin,
 } from "@/queries/AuthApis";
+import { setCookie, getCookie, removeCookie } from "@/utils/cookies";
 
 interface TwitterAuthContextType {
   user: AuthUser | null;
@@ -42,8 +43,8 @@ export const TwitterAuthProvider = ({ children }: TwitterAuthProviderProps) => {
   const [initialized, setInitialized] = useState<boolean>(false);
 
   useEffect(() => {
-    const storedToken = window.localStorage.getItem("twitter_token");
-    const storedUser = window.localStorage.getItem("twitter_user");
+    const storedToken = getCookie("twitter_token");
+    const storedUser = getCookie("twitter_user");
 
     if (storedToken && storedUser) {
       try {
@@ -52,8 +53,8 @@ export const TwitterAuthProvider = ({ children }: TwitterAuthProviderProps) => {
         setUser(parsedUser);
       } catch (error) {
         console.error("Failed to parse stored Twitter user:", error);
-        window.localStorage.removeItem("twitter_token");
-        window.localStorage.removeItem("twitter_user");
+        removeCookie("twitter_token");
+        removeCookie("twitter_user");
       }
     }
 
@@ -63,8 +64,22 @@ export const TwitterAuthProvider = ({ children }: TwitterAuthProviderProps) => {
   const startTwitterLogin = useCallback(async (redirectPath?: string) => {
     try {
       setLoading(true);
+
+      // Normalize origin: Twitter's callback is configured for "localhost",
+      // so if the user is on "127.0.0.1" the cookie would be set on a
+      // different origin and lost after the OAuth redirect.  Redirect to
+      // the equivalent "localhost" URL first so everything stays on one origin.
+      if (window.location.hostname === "127.0.0.1") {
+        const localhostUrl = window.location.href.replace(
+          "127.0.0.1",
+          "localhost",
+        );
+        window.location.href = localhostUrl;
+        return;
+      }
+
       if (redirectPath) {
-        window.sessionStorage.setItem(TWITTER_AUTH_REDIRECT_KEY, redirectPath);
+        setCookie(TWITTER_AUTH_REDIRECT_KEY, redirectPath, 600);
       }
       const authUrl = await getTwitterLoginUrl();
       window.location.href = authUrl;
@@ -74,28 +89,28 @@ export const TwitterAuthProvider = ({ children }: TwitterAuthProviderProps) => {
     }
   }, []);
 
-  const completeCallback = useCallback(async (
-    oauthToken: string,
-    oauthVerifier: string,
-  ) => {
-    setLoading(true);
-    try {
-      const result = await completeTwitterLogin(oauthToken, oauthVerifier);
-      setToken(result.token);
-      setUser(result.user);
+  const completeCallback = useCallback(
+    async (oauthToken: string, oauthVerifier: string) => {
+      setLoading(true);
+      try {
+        const result = await completeTwitterLogin(oauthToken, oauthVerifier);
+        setToken(result.token);
+        setUser(result.user);
 
-      window.localStorage.setItem("twitter_token", result.token);
-      window.localStorage.setItem("twitter_user", JSON.stringify(result.user));
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+        setCookie("twitter_token", result.token);
+        setCookie("twitter_user", JSON.stringify(result.user));
+      } finally {
+        setLoading(false);
+      }
+    },
+    [],
+  );
 
   const logout = useCallback(() => {
     setToken(null);
     setUser(null);
-    window.localStorage.removeItem("twitter_token");
-    window.localStorage.removeItem("twitter_user");
+    removeCookie("twitter_token");
+    removeCookie("twitter_user");
   }, []);
 
   const value: TwitterAuthContextType = useMemo(
@@ -108,7 +123,15 @@ export const TwitterAuthProvider = ({ children }: TwitterAuthProviderProps) => {
       completeCallback,
       logout,
     }),
-    [user, token, loading, initialized, startTwitterLogin, completeCallback, logout],
+    [
+      user,
+      token,
+      loading,
+      initialized,
+      startTwitterLogin,
+      completeCallback,
+      logout,
+    ],
   );
 
   return (

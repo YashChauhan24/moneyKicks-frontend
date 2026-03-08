@@ -25,7 +25,6 @@ import {
   usePublicClient,
 } from "wagmi";
 import { parseEther } from "viem";
-import { BETTING_CONTRACT_ABI } from "@/config/bettingContract";
 import { useNetwork } from "@/contexts/NetworkContext";
 import { toast } from "sonner";
 
@@ -165,7 +164,8 @@ const CreateBet = () => {
 
       // console.log("Create Bet TX Hash:", txHash);
 
-      const shareLink = `${window.location.origin}/betting/${betId}`;
+      const oppositeSide = formData.side === "A" ? "B" : "A";
+      const shareLink = `${window.location.origin}/betting/${betId}/invite?side=${oppositeSide}`;
 
       setCreatedBetLink(shareLink);
       setBetCreated(true);

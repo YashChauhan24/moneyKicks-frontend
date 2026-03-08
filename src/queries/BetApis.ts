@@ -1,4 +1,5 @@
 import axios from "axios";
+import { getCookie } from "@/utils/cookies";
 
 const API_BASE_URL =
   import.meta.env.VITE_BASE_URL ?? "http://localhost:4000/api";
@@ -55,7 +56,7 @@ export type GetBetsParams = {
 
 export const createBet = async (payload: CreateBetPayload) => {
   try {
-    const token = localStorage.getItem("twitter_token"); // assuming you store JWT
+    const token = getCookie("twitter_token"); // assuming you store JWT
 
     const { data } = await axios.post(`${API_BASE_URL}/bets`, payload, {
       headers: {
@@ -97,7 +98,7 @@ export const makePrediction = async (
   betId: string,
   payload: { side: "A" | "B"; amount: number },
 ) => {
-  const token = localStorage.getItem("twitter_token");
+  const token = getCookie("twitter_token");
 
   const { data } = await axios.post(
     `${API_BASE_URL}/bets/${betId}/predictions`,

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import {
   Trophy,
   Target,
@@ -20,6 +20,7 @@ import BouncingMoney from "@/components/ui/BouncingMoney";
 import { fetchDashboard, DashboardResponse } from "@/queries/DashboardApis";
 
 const Dashboard = () => {
+  const navigate = useNavigate();
   const [data, setData] = useState<DashboardResponse | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -393,6 +394,7 @@ const Dashboard = () => {
                             size="sm"
                             variant="ghost"
                             className="text-primary hover:text-primary/80"
+                            onClick={() => navigate(`/betting/${bet.id}`)}
                           >
                             View <ArrowRight className="w-4 h-4 ml-1" />
                           </Button>

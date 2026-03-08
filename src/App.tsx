@@ -11,6 +11,7 @@ import Jackpot from "./pages/Jackpot";
 import BettingList from "./pages/BettingList";
 import CreateBet from "./pages/CreateBet";
 import BetDetail from "./pages/BetDetail";
+import AcceptInvite from "./pages/AcceptInvite";
 import AdminPanel from "./pages/AdminPanel";
 import TwitterCallback from "./pages/TwitterCallback";
 import NotFound from "./pages/NotFound";
@@ -34,6 +35,10 @@ const App = () => (
                   <Route path="/jackpot" element={<Jackpot />} />
                   <Route path="/betting" element={<BettingList />} />
                   <Route path="/betting/create" element={<CreateBet />} />
+                  <Route
+                    path="/betting/:id/invite"
+                    element={<AcceptInvite />}
+                  />
                   <Route path="/betting/:id" element={<BetDetail />} />
                   <Route
                     path="/auth/twitter/callback"

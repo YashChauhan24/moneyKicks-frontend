@@ -4,6 +4,7 @@ import { Loader2 } from "lucide-react";
 import Layout from "@/components/layout/Layout";
 import { Button } from "@/components/ui/button";
 import { useTwitterAuth } from "@/contexts/TwitterAuthContext";
+import { getCookie, removeCookie } from "@/utils/cookies";
 
 const TwitterCallback = () => {
   const TWITTER_AUTH_REDIRECT_KEY = "twitter_auth_redirect";
@@ -29,11 +30,14 @@ const TwitterCallback = () => {
 
       try {
         await completeCallback(oauthToken, oauthVerifier);
+
+        const storedRedirect = getCookie(TWITTER_AUTH_REDIRECT_KEY);
+
         const redirectPath =
-          searchParams.get("redirect") ??
-          window.sessionStorage.getItem(TWITTER_AUTH_REDIRECT_KEY) ??
-          "/";
-        window.sessionStorage.removeItem(TWITTER_AUTH_REDIRECT_KEY);
+          searchParams.get("redirect") ?? storedRedirect ?? "/";
+
+        removeCookie(TWITTER_AUTH_REDIRECT_KEY);
+
         navigate(redirectPath, { replace: true });
       } catch (callbackError) {
         console.error("Twitter callback failed:", callbackError);
