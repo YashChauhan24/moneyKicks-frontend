@@ -137,7 +137,7 @@ const CreateBet = () => {
         endCondition: formData.endCondition,
         stakeAmount: Number(formData.stakeAmount),
         currency: "AVAX",
-        status: "live" as const,
+        status: "pending" as const,
         startAt: formData.startAt,
         endAt: formData.endAt,
         side: formData.side,

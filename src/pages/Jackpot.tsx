@@ -65,7 +65,7 @@ const Jackpot = () => {
   }> => {
     try {
       setIsLoadingJackpot(true);
-      const resp = await fetchCurrentJackpot(wallet || undefined);
+      const resp = await fetchCurrentJackpot(wallet || undefined, true);
       const active = resp.data.find((j) => j.isActive);
       setCurrentJackpot(active || null);
 
@@ -264,6 +264,18 @@ const Jackpot = () => {
     { address: "9mNq...8Hk4", prize: "$14,550", place: 2 },
     { address: "3wRt...1Lp7", prize: "$9,700", place: 3 },
   ];
+
+  const getTimeLeft = (endAt: string) => {
+    const diff = new Date(endAt).getTime() - new Date().getTime();
+
+    if (diff <= 0) return "Ended";
+
+    const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+    const hours = Math.floor((diff / (1000 * 60 * 60)) % 24);
+    const mins = Math.floor((diff / (1000 * 60)) % 60);
+
+    return `${days}d ${hours}h ${mins}m`;
+  };
 
   return (
     <Layout>
@@ -549,8 +561,9 @@ const Jackpot = () => {
                               <div className="bg-secondary/50 rounded-lg p-4">
                                 <Clock className="w-6 h-6 text-primary mx-auto mb-2" />
                                 <p className="text-lg font-bold text-foreground">
-                                  {/* Placeholder static text for now */}
-                                  3d 14h 22m
+                                  {currentJackpot
+                                    ? getTimeLeft(currentJackpot.endAt)
+                                    : "3d 14h 22m"}
                                 </p>
                                 <p className="text-xs text-muted-foreground">
                                   Time Left
@@ -868,28 +881,6 @@ const Jackpot = () => {
                         <p className="text-xl font-bold text-foreground">
                           Friday, 8:00 PM UTC
                         </p>
-                      </div>
-
-                      {/* Demo buttons for showing result states */}
-                      <div className="space-y-4">
-                        <p className="text-sm text-muted-foreground">
-                          Demo: See result states
-                        </p>
-                        <div className="flex flex-col sm:flex-row gap-4 justify-center">
-                          <Button
-                            onClick={() => handleSimulateResult(true)}
-                            className="bg-success text-success-foreground hover:bg-success/90"
-                          >
-                            Simulate Win
-                          </Button>
-                          <Button
-                            onClick={() => handleSimulateResult(false)}
-                            variant="outline"
-                            className="border-destructive/50 text-destructive hover:bg-destructive/10"
-                          >
-                            Simulate Loss
-                          </Button>
-                        </div>
                       </div>
                     </GlowCard>
                   </motion.div>

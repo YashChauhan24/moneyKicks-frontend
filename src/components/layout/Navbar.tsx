@@ -92,10 +92,8 @@ const Navbar = () => {
               className="flex items-center gap-3"
               whileHover={{ scale: 1.02 }}
             >
-              <div className="relative h-10 w-10 rounded-lg bg-primary flex items-center justify-center">
-                <span className="text-2xl font-bold text-primary-foreground">
-                  M
-                </span>
+              <div className="relative h-10 w-10 rounded-lg flex items-center justify-center">
+                <img src="/final_logo.png" alt="Logo" className="w-20 h-10" />
               </div>
               <span className="text-xl font-bold text-foreground">
                 MoneyKicks

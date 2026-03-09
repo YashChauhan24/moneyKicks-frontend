@@ -27,11 +27,17 @@ interface JackpotListResponse {
   data: JackpotItem[];
 }
 
-export const fetchCurrentJackpot = async (walletAddress?: string) => {
+export const fetchCurrentJackpot = async (
+  walletAddress?: string,
+  isActive?: boolean,
+) => {
   const response = await axios.get<JackpotListResponse>(
     `${API_BASE_URL}/jackpots`,
     {
-      params: walletAddress ? { wallet: walletAddress } : undefined,
+      params: {
+        walletAddress: walletAddress ? { wallet: walletAddress } : undefined,
+        isActive: isActive !== undefined ? { isActive } : undefined,
+      },
     },
   );
   return response.data;

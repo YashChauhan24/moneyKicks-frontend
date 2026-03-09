@@ -14,7 +14,7 @@ export type CreateBetPayload = {
   currency: string;
   endAt: string;
   startAt: string;
-  status: "live";
+  status: "pending";
 };
 
 export interface ApiBetStats {
@@ -102,6 +102,25 @@ export const makePrediction = async (
 
   const { data } = await axios.post(
     `${API_BASE_URL}/bets/${betId}/predictions`,
+    payload,
+    {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    },
+  );
+
+  return data;
+};
+
+export const acceptInvite = async (
+  betId: string,
+  payload: { side: "A" | "B" },
+) => {
+  const token = getCookie("twitter_token");
+
+  const { data } = await axios.post(
+    `${API_BASE_URL}/bets/${betId}/accept-invite`,
     payload,
     {
       headers: {
