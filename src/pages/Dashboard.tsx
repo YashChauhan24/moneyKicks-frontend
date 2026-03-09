@@ -1,5 +1,11 @@
-import { useEffect, useState } from "react";
-import { motion } from "framer-motion";
+import { type MouseEvent, useEffect, useRef, useState } from "react";
+import {
+  motion,
+  useMotionTemplate,
+  useMotionValue,
+  useSpring,
+  useTransform,
+} from "framer-motion";
 import { Link, useNavigate } from "react-router-dom";
 import {
   Trophy,
@@ -16,13 +22,14 @@ import { formatCurrency } from "@/lib/utils";
 import Layout from "@/components/layout/Layout";
 import StatCard from "@/components/ui/StatCard";
 import GlowCard from "@/components/ui/GlowCard";
-import BouncingMoney from "@/components/ui/BouncingMoney";
+import DashboardHeroVisual from "@/components/ui/DashboardHeroVisual";
 import { fetchDashboard, DashboardResponse } from "@/queries/DashboardApis";
 
 const Dashboard = () => {
   const navigate = useNavigate();
   const [data, setData] = useState<DashboardResponse | null>(null);
   const [loading, setLoading] = useState(true);
+  const dashboardRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const loadData = async () => {
@@ -39,6 +46,38 @@ const Dashboard = () => {
   }, []);
 
   const recentBets = data?.recentBets ?? [];
+  const mouseX = useMotionValue(50);
+  const mouseY = useMotionValue(30);
+  const smoothMouseX = useSpring(mouseX, {
+    stiffness: 120,
+    damping: 24,
+    mass: 0.4,
+  });
+  const smoothMouseY = useSpring(mouseY, {
+    stiffness: 120,
+    damping: 24,
+    mass: 0.4,
+  });
+  const spotlight = useMotionTemplate`radial-gradient(560px circle at ${smoothMouseX}% ${smoothMouseY}%, hsl(var(--primary) / 0.14), transparent 62%)`;
+  const glowHalo = useMotionTemplate`radial-gradient(260px circle at ${smoothMouseX}% ${smoothMouseY}%, hsl(var(--primary) / 0.24), transparent 70%)`;
+  const pulseX = useTransform(smoothMouseX, (value) => `${value}%`);
+  const pulseY = useTransform(smoothMouseY, (value) => `${value}%`);
+
+  const handleDashboardMouseMove = (event: MouseEvent<HTMLDivElement>) => {
+    const bounds = dashboardRef.current?.getBoundingClientRect();
+    if (!bounds) return;
+
+    const x = ((event.clientX - bounds.left) / bounds.width) * 100;
+    const y = ((event.clientY - bounds.top) / bounds.height) * 100;
+
+    mouseX.set(x);
+    mouseY.set(y);
+  };
+
+  const resetDashboardPointer = () => {
+    mouseX.set(50);
+    mouseY.set(30);
+  };
 
   const container = {
     hidden: { opacity: 0 },
@@ -55,9 +94,40 @@ const Dashboard = () => {
 
   return (
     <Layout>
-      <div className="min-h-screen px-4 sm:px-6 lg:px-8 py-8">
-        <div className="max-w-7xl mx-auto">
-          {/* Hero Section with Bouncing Money */}
+      <div
+        ref={dashboardRef}
+        className="relative min-h-screen overflow-hidden px-4 py-8 sm:px-6 lg:px-8"
+        onMouseMove={handleDashboardMouseMove}
+        onMouseLeave={resetDashboardPointer}
+      >
+        <div className="pointer-events-none absolute inset-0 z-0 bg-[linear-gradient(to_right,hsl(var(--border)/0.25)_1px,transparent_1px),linear-gradient(to_bottom,hsl(var(--border)/0.25)_1px,transparent_1px)] bg-[size:32px_32px] opacity-35 [mask-image:radial-gradient(ellipse_at_center,black_45%,transparent_85%)]" />
+        <motion.div
+          className="pointer-events-none absolute inset-0 z-0"
+          style={{ background: spotlight }}
+        />
+        <motion.div
+          className="pointer-events-none absolute inset-0 z-0 opacity-80"
+          style={{ background: glowHalo }}
+        />
+        <motion.div
+          className="pointer-events-none absolute z-0 hidden h-56 w-56 -translate-x-1/2 -translate-y-1/2 rounded-full border border-primary/25 bg-primary/10 blur-sm lg:block"
+          style={{ left: pulseX, top: pulseY }}
+          animate={{ scale: [1, 1.22, 1], opacity: [0.16, 0.35, 0.16] }}
+          transition={{ duration: 1.9, repeat: Infinity, ease: "easeInOut" }}
+        />
+        {/* <div className="pointer-events-none absolute right-8 top-8 z-20 hidden items-center gap-2 rounded-full border border-primary/25 bg-card/80 px-4 py-2 backdrop-blur lg:flex">
+          <motion.span
+            className="h-2.5 w-2.5 rounded-full bg-success"
+            animate={{ opacity: [0.3, 1, 0.3] }}
+            transition={{ duration: 1.4, repeat: Infinity, ease: "easeInOut" }}
+          />
+          <span className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+            Live Pulse
+          </span>
+        </div> */}
+
+        <div className="relative z-10 mx-auto max-w-7xl">
+          {/* Hero Section with Interactive Dashboard Visual */}
           <motion.div
             className="mb-20 pt-8"
             initial={{ opacity: 0, y: -20 }}
@@ -99,18 +169,25 @@ const Dashboard = () => {
                 </div>
               </div>
 
-              {/* Bouncing Money */}
+              {/* Interactive Hero Visual */}
               <div className="hidden lg:block">
-                <BouncingMoney />
+                <DashboardHeroVisual
+                  totalValueLocked={data?.stats.totalValueLocked}
+                  activeBets={data?.stats.activeBets}
+                  activeUsers={data?.stats.activeUsers}
+                  currency={"AVAX"}
+                  jackpotActive={Boolean(data?.jackpot)}
+                />
               </div>
             </div>
 
             {/* Info Banner */}
-            <div className="flex items-start gap-4 bg-secondary/50 rounded-lg p-5 max-w-2xl border border-border">
-              <div className="p-3 bg-primary/10 rounded-lg">
+            <div className="relative overflow-hidden flex items-start gap-4 rounded-2xl border border-primary/20 bg-gradient-to-br from-card/95 via-card to-primary/[0.08] p-5 shadow-[0_28px_65px_-45px_hsl(var(--primary)/0.9)] backdrop-blur-sm max-w-2xl">
+              <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_right,hsl(var(--primary)/0.14),transparent_45%)]" />
+              <div className="relative p-3 bg-primary/10 rounded-xl border border-primary/30 shadow-[inset_0_1px_0_hsl(var(--background)/0.7)]">
                 <Trophy className="w-6 h-6 text-primary" />
               </div>
-              <div>
+              <div className="relative">
                 <p className="text-foreground font-medium">
                   Weekly jackpot is now active. Enter for just{" "}
                   {formatCurrency(data?.jackpot?.minAmount ?? "2")}{" "}
@@ -134,36 +211,56 @@ const Dashboard = () => {
             initial="hidden"
             animate="show"
           >
-            <motion.div variants={item}>
+            <motion.div
+              variants={item}
+              whileHover={{ y: -4 }}
+              transition={{ type: "spring", stiffness: 260, damping: 20 }}
+            >
               <StatCard
                 title="Total Value Locked"
-                value={`$${formatCurrency(data?.stats.totalValueLocked || 0)}`}
+                value={`${formatCurrency(data?.stats.totalValueLocked || 0)} AVAX`}
                 icon={Wallet}
                 color="primary"
+                className="min-h-[152px]"
               />
             </motion.div>
-            <motion.div variants={item}>
+            <motion.div
+              variants={item}
+              whileHover={{ y: -4 }}
+              transition={{ type: "spring", stiffness: 260, damping: 20 }}
+            >
               <StatCard
                 title="Active Bets"
                 value={(data?.stats.activeBets || 0).toLocaleString()}
                 icon={Target}
                 color="primary"
+                className="min-h-[152px]"
               />
             </motion.div>
-            <motion.div variants={item}>
+            <motion.div
+              variants={item}
+              whileHover={{ y: -4 }}
+              transition={{ type: "spring", stiffness: 260, damping: 20 }}
+            >
               <StatCard
                 title="Weekly Jackpot"
                 value={data?.jackpot ? "Active" : "Inactive"}
                 icon={Trophy}
                 color="success"
+                className="min-h-[152px]"
               />
             </motion.div>
-            <motion.div variants={item}>
+            <motion.div
+              variants={item}
+              whileHover={{ y: -4 }}
+              transition={{ type: "spring", stiffness: 260, damping: 20 }}
+            >
               <StatCard
                 title="Active Users"
                 value={(data?.stats.activeUsers || 0).toLocaleString()}
                 icon={Users}
                 color="primary"
+                className="min-h-[152px]"
               />
             </motion.div>
           </motion.div>
@@ -176,11 +273,15 @@ const Dashboard = () => {
             animate="show"
           >
             {/* Jackpot Card */}
-            <motion.div variants={item}>
-              <GlowCard className="h-full">
+            <motion.div
+              variants={item}
+              whileHover={{ y: -6 }}
+              transition={{ type: "spring", stiffness: 220, damping: 18 }}
+            >
+              <GlowCard className="h-full overflow-hidden rounded-2xl border-primary/20 bg-gradient-to-b from-card/95 via-card to-primary/[0.05] shadow-[0_35px_80px_-52px_hsl(var(--primary)/0.95)]">
                 <div className="flex flex-col h-full">
                   <div className="flex items-center gap-4 mb-6">
-                    <div className="p-4 rounded-lg bg-primary/10 border border-primary/30">
+                    <div className="p-4 rounded-xl border border-primary/30 bg-primary/10 shadow-[inset_0_1px_0_hsl(var(--background)/0.8)]">
                       <Trophy className="w-8 h-8 text-primary" />
                     </div>
                     <div>
@@ -196,7 +297,7 @@ const Dashboard = () => {
                   </div>
 
                   <div className="flex-grow">
-                    <div className="bg-secondary/50 rounded-lg p-6 mb-6">
+                    <div className="rounded-xl border border-primary/20 bg-gradient-to-br from-secondary/70 to-secondary/30 p-6 mb-6">
                       <p className="text-sm text-muted-foreground mb-2">
                         Jackpot minimum entry
                       </p>
@@ -241,7 +342,7 @@ const Dashboard = () => {
                   </div>
 
                   <Link to="/jackpot" className="block">
-                    <Button className="w-full bg-primary text-primary-foreground hover:bg-primary/90 font-semibold text-lg h-14">
+                    <Button className="w-full h-14 bg-primary text-primary-foreground font-semibold text-lg shadow-[0_18px_35px_-20px_hsl(var(--primary)/0.95)] hover:bg-primary/90">
                       <Zap className="w-5 h-5 mr-2" />
                       Enter Weekly Draw
                       <ArrowRight className="w-5 h-5 ml-2" />
@@ -252,11 +353,15 @@ const Dashboard = () => {
             </motion.div>
 
             {/* Betting Card */}
-            <motion.div variants={item}>
-              <GlowCard className="h-full">
+            <motion.div
+              variants={item}
+              whileHover={{ y: -6 }}
+              transition={{ type: "spring", stiffness: 220, damping: 18 }}
+            >
+              <GlowCard className="h-full overflow-hidden rounded-2xl border-primary/20 bg-gradient-to-b from-card/95 via-card to-primary/[0.04] shadow-[0_35px_80px_-52px_hsl(var(--primary)/0.85)]">
                 <div className="flex flex-col h-full">
                   <div className="flex items-center gap-4 mb-6">
-                    <div className="p-4 rounded-lg bg-primary/10 border border-primary/30">
+                    <div className="p-4 rounded-xl border border-primary/30 bg-primary/10 shadow-[inset_0_1px_0_hsl(var(--background)/0.8)]">
                       <Target className="w-8 h-8 text-primary" />
                     </div>
                     <div>
@@ -274,7 +379,7 @@ const Dashboard = () => {
                       {recentBets.slice(0, 2).map((bet) => (
                         <div
                           key={bet.id}
-                          className="bg-secondary/50 rounded-lg p-4 border border-border hover:border-primary/50 transition-colors"
+                          className="rounded-xl border border-border/80 bg-gradient-to-r from-secondary/60 to-secondary/30 p-4 transition-all hover:border-primary/45 hover:shadow-[0_20px_45px_-35px_hsl(var(--primary)/0.9)]"
                         >
                           <div className="flex items-center justify-between mb-2">
                             <h3 className="font-semibold text-foreground">
@@ -301,7 +406,7 @@ const Dashboard = () => {
                       ))}
                     </div>
 
-                    <div className="bg-secondary/30 rounded-lg p-4 mb-6">
+                    <div className="rounded-xl border border-primary/20 bg-gradient-to-br from-secondary/45 to-secondary/20 p-4 mb-6">
                       <div className="flex items-center gap-2 text-primary mb-2">
                         <TrendingUp className="w-4 h-4" />
                         <span className="font-medium">Hot Bets</span>
@@ -338,7 +443,10 @@ const Dashboard = () => {
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.4 }}
           >
-            <GlowCard hover={false}>
+            <GlowCard
+              hover={false}
+              className="overflow-hidden rounded-2xl border-primary/15 bg-gradient-to-b from-card/95 to-card/80 shadow-[0_30px_65px_-50px_hsl(var(--primary)/0.8)]"
+            >
               <h2 className="text-xl font-bold text-foreground mb-6">
                 Recent Activity
               </h2>

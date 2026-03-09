@@ -9,6 +9,7 @@ export interface DashboardStats {
   totalValueLocked: number;
   activeBets: number;
   activeUsers: number;
+  currency: "USD" | "AVAX";
 }
 
 export interface RecentBet {
