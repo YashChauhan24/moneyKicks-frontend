@@ -1,73 +1,138 @@
-# Welcome to your Lovable project
+# moneyKicks Frontend
 
-## Project info
+React frontend for the `moneyKicks` Web3 betting product. The app combines a landing/dashboard experience, bet creation and participation flows, jackpot participation, Twitter-based authentication, wallet connectivity, and Avalanche-based token operations.
 
-**URL**: https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID
+## Tech Stack
 
-## How can I edit this code?
+- React 18 + TypeScript
+- Vite 5
+- React Router 6
+- Tailwind CSS
+- shadcn/ui + Radix UI
+- TanStack Query
+- Wagmi + Reown AppKit
+- Vitest + Testing Library
 
-There are several ways of editing your application.
+## Core Features
 
-**Use Lovable**
+- Dashboard and landing experience
+- Betting list, detail, creation, and invite acceptance flows
+- Jackpot participation flow
+- Twitter/X OAuth callback handling
+- Avalanche mainnet and Fuji testnet support
+- Wallet connection with Reown AppKit
+- Encrypted token operations backed by `@avalabs/eerc-sdk`
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and start prompting.
+## Project Structure
 
-Changes made via Lovable will be committed automatically to this repo.
+```text
+src/
+  components/    Reusable UI and feature components
+  config/        Contract addresses and circuit configuration
+  contexts/      Network, admin auth, and Twitter auth state
+  pages/         Route-level screens
+  providers/     Wallet-related providers
+  queries/       API client modules
+  utils/         Shared helpers and environment access
+  test/          Vitest setup and tests
+docs/
+  technical-documentation.md
+public/
+  zk circuits, logos, static assets
+```
 
-**Use your preferred IDE**
+## Routes
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+- `/` dashboard
+- `/jackpot` jackpot flow
+- `/betting` bet list
+- `/betting/create` create bet
+- `/betting/:id` bet detail
+- `/betting/:id/invite` invite acceptance
+- `/operations` encrypted token operations
+- `/admin` admin panel
+- `/auth/twitter/callback` Twitter OAuth callback
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+## Prerequisites
 
-Follow these steps:
+- Node.js 18+ recommended
+- npm
+- A valid `VITE_REOWN_PROJECT_ID`
+- Backend API running locally or remotely
 
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
+## Environment Variables
 
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
+Create a `.env` file in the project root:
 
-# Step 3: Install the necessary dependencies.
-npm i
+```env
+VITE_REOWN_PROJECT_ID=your_reown_project_id
+VITE_BASE_URL=http://localhost:4000/api
+VITE_NETWORK=mainnet-beta
+```
 
-# Step 4: Start the development server with auto-reloading and an instant preview.
+### Notes
+
+- `VITE_REOWN_PROJECT_ID` is required. The app throws on startup if it is missing.
+- `VITE_BASE_URL` is used by the API modules under `src/queries`.
+- `VITE_NETWORK` is read by utility config; the in-app network switcher persists the active mode in `localStorage`.
+
+## Getting Started
+
+```bash
+npm install
 npm run dev
 ```
 
-**Edit a file directly in GitHub**
+The Vite dev server runs on `http://localhost:8080`.
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+## Available Scripts
 
-**Use GitHub Codespaces**
+```bash
+npm run dev         # Start local dev server
+npm run build       # Create production build
+npm run build:dev   # Build in development mode
+npm run preview     # Preview production build locally
+npm run lint        # Run ESLint
+npm run test        # Run Vitest once
+npm run test:watch  # Run Vitest in watch mode
+```
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+## Configuration Overview
 
-## What technologies are used for this project?
+### Wallet and networks
 
-This project is built with:
+- Reown AppKit is initialized in `src/reown.tsx`
+- Supported EVM networks: Avalanche mainnet and Fuji
+- The selected network is managed in `src/contexts/NetworkContext.tsx`
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+### API integration
 
-## How can I deploy this project?
+Backend requests are grouped under `src/queries`:
 
-Simply open [Lovable](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and click on Share -> Publish.
+- `AuthApis.ts`
+- `DashboardApis.ts`
+- `BetApis.ts`
+- `OperationApis.ts`
+- `JackpotApis.ts`
 
-## Can I connect a custom domain to my Lovable project?
+### Contracts and circuits
 
-Yes, you can!
+- Contract and token configuration lives in `src/config/contracts.ts`
+- Local ZK circuit artifacts are served from `public/`
 
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
+## Testing
 
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+Vitest is configured with `jsdom` and Testing Library. Test setup lives in `src/test/setup.ts`.
+
+Run:
+
+```bash
+npm run test
+```
+
+## Implementation Notes
+
+- The app is a client-rendered SPA using `BrowserRouter`
+- Twitter auth state is persisted with cookies
+- Admin auth is currently frontend-managed and should be treated as non-production unless backed by a real server flow
+- Some operations depend on external services and Avalanche-compatible wallets being available in the browser
