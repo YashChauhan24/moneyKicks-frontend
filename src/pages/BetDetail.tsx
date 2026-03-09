@@ -151,6 +151,7 @@ const BetDetail = () => {
       await makePrediction(id, {
         side: selectedCompetitor,
         amount: Number(betAmount),
+        walletAddress: address,
       });
 
       setStep("confirmed");

@@ -78,47 +78,73 @@ const CreateBet = () => {
     setStep(step - 1);
   };
 
-  const handlePay = async (stakeAmount: string) => {
-    if (!isConnected && !address) {
-      toast.error("Please connect your Avalanche wallet first.");
-      return;
+  const handlePay = async (stakeAmount: string): Promise<`0x${string}`> => {
+    if (!isConnected || !address) {
+      throw new Error("Please connect your Avalanche wallet first.");
     }
 
-    if (bettingAddress == address) {
-      toast.error("The toWallet and fromWallet can't be same.");
-      return;
+    if (bettingAddress.toLowerCase() === address.toLowerCase()) {
+      throw new Error("The toWallet and fromWallet can't be same.");
     }
+
+    if (!walletClient || !publicClient) {
+      throw new Error("Wallet not ready");
+    }
+
+    const amount = Number(stakeAmount);
+    if (!Number.isFinite(amount) || amount <= 0) {
+      throw new Error("Invalid bet stake amount.");
+    }
+
+    const valueWei = parseEther(stakeAmount);
 
     setIsPaying(true);
     try {
-      if (!walletClient || !publicClient) {
-        throw new Error("Wallet not ready");
-      }
+      let paymentHash: `0x${string}`;
 
-      const amount = Number(stakeAmount);
-      if (!Number.isFinite(amount) || amount <= 0) {
-        throw new Error("Invalid jackpot minimum amount.");
-      }
-      const valueWei = parseEther(stakeAmount);
+      try {
+        paymentHash = await sendTransactionAsync({
+          to: bettingAddress as `0x${string}`,
+          value: valueWei,
+        });
+      } catch (error) {
+        const errMessage =
+          error instanceof Error ? error.message.toLowerCase() : "";
 
-      const hash = await sendTransactionAsync({
-        to: bettingAddress as `0x${string}`,
-        value: valueWei,
-      });
+        // Some RPCs fail to estimate gas for plain value transfer; retry with base transfer gas.
+        if (
+          errMessage.includes("unable to calculate gas limit") ||
+          errMessage.includes("estimate gas")
+        ) {
+          paymentHash = await sendTransactionAsync({
+            to: bettingAddress as `0x${string}`,
+            value: valueWei,
+            gas: 21000n,
+          });
+        } else {
+          throw error;
+        }
+      }
 
       toast.info("Transaction submitted. Waiting for confirmation...");
 
-      // Wait for confirmation
       const receipt = await publicClient.waitForTransactionReceipt({
-        hash,
+        hash: paymentHash,
       });
 
       if (receipt.status !== "success") {
         throw new Error("Transaction failed on chain.");
       }
+
+      return paymentHash;
     } catch (error) {
-      console.error("Jackpot payment failed:", error);
-      toast.error("Payment failed. Please try again.");
+      console.error("Bet payment failed:", error);
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Payment failed. Please try again.";
+      toast.error(message);
+      throw error;
     } finally {
       setIsPaying(false);
     }
@@ -128,7 +154,13 @@ const CreateBet = () => {
     try {
       setIsCreating(true);
 
-      // 1. Save Bet to Backend DB (creates UUID needed for smart contract)
+      if (!address) {
+        throw new Error("Please connect your Avalanche wallet first.");
+      }
+
+      await handlePay(formData.stakeAmount);
+
+      // 1. Save Bet to Backend DB only after payment confirmation
       const payload = {
         title: `${formData.competitorA} vs ${formData.competitorB}`,
         description: formData.description,
@@ -140,10 +172,9 @@ const CreateBet = () => {
         status: "pending" as const,
         startAt: formData.startAt,
         endAt: formData.endAt,
-        side: formData.side,
+        side: formData.side as "A" | "B",
+        walletAddress: address,
       };
-
-      await handlePay(formData.stakeAmount);
 
       const res = await createBet(payload);
       const betId = res?.data?.id;
@@ -170,8 +201,10 @@ const CreateBet = () => {
       setCreatedBetLink(shareLink);
       setBetCreated(true);
     } catch (error) {
-      console.error(error);
-      alert("Failed to create bet");
+      console.error("Create bet failed:", error);
+      const message =
+        error instanceof Error ? error.message : "Failed to create bet";
+      toast.error(message);
     } finally {
       setIsCreating(false);
     }

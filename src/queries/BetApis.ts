@@ -15,6 +15,8 @@ export type CreateBetPayload = {
   endAt: string;
   startAt: string;
   status: "pending";
+  side?: "A" | "B";
+  walletAddress?: string;
 };
 
 export interface ApiBetStats {
@@ -96,7 +98,7 @@ export const getBetById = async (id: string): Promise<{ data: ApiBet }> => {
 
 export const makePrediction = async (
   betId: string,
-  payload: { side: "A" | "B"; amount: number },
+  payload: { side: "A" | "B"; amount: number; walletAddress: string },
 ) => {
   const token = getCookie("twitter_token");
 
@@ -115,7 +117,7 @@ export const makePrediction = async (
 
 export const acceptInvite = async (
   betId: string,
-  payload: { side: "A" | "B" },
+  payload: { side: "A" | "B"; walletAddress: string },
 ) => {
   const token = getCookie("twitter_token");
 

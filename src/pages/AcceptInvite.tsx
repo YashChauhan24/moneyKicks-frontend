@@ -20,7 +20,12 @@ import { Button } from "@/components/ui/button";
 import Layout from "@/components/layout/Layout";
 import GlowCard from "@/components/ui/GlowCard";
 
-import { getBetById, ApiBet, makePrediction } from "@/queries/BetApis";
+import {
+  getBetById,
+  ApiBet,
+  makePrediction,
+  acceptInvite,
+} from "@/queries/BetApis";
 import {
   useAccount,
   useWalletClient,
@@ -116,9 +121,9 @@ const AcceptInvite = () => {
       }
 
       // 3. Record the prediction on the backend
-      await makePrediction(id, {
+      await acceptInvite(id, {
         side: assignedSide,
-        amount: Number(stakeAmount),
+        walletAddress: address,
       });
 
       setStep("accepted");
