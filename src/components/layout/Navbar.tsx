@@ -33,7 +33,7 @@ const Navbar = () => {
     { path: "/jackpot", label: "Jackpot", icon: Trophy },
     { path: "/betting", label: "Betting", icon: Target },
     { path: "/operations", label: "Operations", icon: Shield },
-    { path: "/admin", label: "Admin", icon: Shield },
+    // { path: "/admin", label: "Admin", icon: Shield },
   ];
 
   const isActive = (path: string) => location.pathname === path;

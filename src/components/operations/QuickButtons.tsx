@@ -1,14 +1,11 @@
-import { useNetwork } from "@/contexts/NetworkContext";
-
 interface QuickButtonsProps {
   setAmount: (amount: string) => void;
+  token: string;
 }
 
-const QuickButtons = ({ setAmount }: QuickButtonsProps) => {
-  const { tokenSymbol } = useNetwork();
+const QuickButtons = ({ setAmount, token }: QuickButtonsProps) => {
   // Different quick amounts for AVAX vs USDC
-  const quickAmounts =
-    tokenSymbol === "AVAX" ? [0.1, 0.5, 1.0, 5.0] : [10, 50, 100, 500];
+  const quickAmounts = [0.1, 0.5, 1.0, 5.0];
 
   return (
     <div>
@@ -22,7 +19,7 @@ const QuickButtons = ({ setAmount }: QuickButtonsProps) => {
             onClick={() => setAmount(amount.toString())}
             className="flex-1 bg-secondary hover:bg-secondary/80 text-foreground py-2 px-4 rounded-lg text-sm font-medium transition-colors"
           >
-            {amount} {tokenSymbol}
+            {amount} {token}
           </button>
         ))}
       </div>

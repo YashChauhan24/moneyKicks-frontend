@@ -462,7 +462,9 @@ const TokenOperationsContent = ({
                   <Tabs
                     value={tab}
                     onValueChange={(v) => {
-                      setTab(v as any);
+                      setTab(
+                        v as "deposit" | "withdraw" | "transfer" | "decrypt",
+                      );
                       setAmount("");
                       setRecipient("");
                     }}
@@ -561,7 +563,10 @@ const TokenOperationsContent = ({
                           className="h-12 text-lg"
                         />
 
-                        <QuickButtons setAmount={setAmount} />
+                        <QuickButtons
+                          setAmount={setAmount}
+                          token={selectedToken}
+                        />
 
                         <div className="flex gap-4">
                           <Button
@@ -599,7 +604,10 @@ const TokenOperationsContent = ({
                           className="h-12 text-lg"
                         />
 
-                        <QuickButtons setAmount={setAmount} />
+                        <QuickButtons
+                          setAmount={setAmount}
+                          token={selectedToken}
+                        />
 
                         <Button
                           onClick={handleWithdraw}

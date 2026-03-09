@@ -1,8 +1,8 @@
 export const SUPPORTED_TOKENS = {
-  DMT: {
-    address: "0xb0Fe621B4Bd7fe4975f7c58E3D6ADaEb2a2A35CD" as `0x${string}`,
-    converter: "0x372dAB27c8d223Af11C858ea00037Dc03053B22E" as `0x${string}`,
-  },
+  // DMT: {
+  //   address: "0xb0Fe621B4Bd7fe4975f7c58E3D6ADaEb2a2A35CD" as `0x${string}`,
+  //   converter: "0x372dAB27c8d223Af11C858ea00037Dc03053B22E" as `0x${string}`,
+  // },
   WAVAX: {
     address: "0xB31f66AA3C1e785363F0875A1B74E27b85FD66c7" as `0x${string}`,
     converter: "0x14150C3D222B8A5cEc5233cB21E43e5b20819d07" as `0x${string}`,
